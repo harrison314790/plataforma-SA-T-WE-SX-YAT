@@ -1,0 +1,1 @@
+# plataforma-SA-T-WE-SX-YAT
