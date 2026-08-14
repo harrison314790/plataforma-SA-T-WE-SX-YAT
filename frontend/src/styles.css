@@ -1,0 +1,200 @@
+/*
+  Design tokens del sistema. Fuente de verdad documentada en
+  .claude/skills/sistema-academico/references/diseno-ui.md -- cualquier
+  cambio de paleta/tipografía/espaciado se hace ahí primero y se refleja
+  acá, nunca al revés.
+*/
+
+:root {
+  /* Morado: marca. SOLO identidad (header, navegación). */
+  --marca-900: #692F6A;
+  --marca-700: #8C3F8D;
+  --marca-500: #A54AA6;
+  --marca-300: #BC6BBD;
+  --marca-100: #F1E4F1;
+  --marca-050: #FAF5FA;
+
+  /* Turquesa: interacción. SOLO botones, enlaces, foco, celda activa. */
+  --accion-900: #0A5C5A;
+  --accion-700: #0E817E;
+  --accion-500: #119895;
+  --accion-300: #15C1BD;
+  --accion-100: #D4F7F6;
+  --accion-050: #EEFCFB;
+
+  /* Verde: nota aprobada */
+  --aprobado-900: #008000;
+  --aprobado-700: #009E00;
+  --aprobado-500: #00C200;
+  --aprobado-100: #D0FBD0;
+  --aprobado-050: #ECFDEC;
+
+  /* Amarillo: nota pendiente de calificar */
+  --pendiente-texto: #7A7400;
+  --pendiente-relleno: #FFF200;
+  --pendiente-100: #FAF8C6;
+  --pendiente-050: #FDFCE7;
+
+  /* Rojo: nota reprobada. PROVISIONAL -- confirmar contra el escudo real (ver diseno-ui.md). */
+  --reprobado-900: #8C1F1F;
+  --reprobado-700: #B23434;
+  --reprobado-500: #D64545;
+  --reprobado-100: #FBD9D9;
+  --reprobado-050: #FDF0F0;
+
+  /* Neutros */
+  --texto-principal: #1A1A1A;
+  --texto-secundario: #5C5C5C;
+  --borde: #E5E5E5;
+  --fondo-solo-lectura: #FAFAFA;
+  --superficie: #FFFFFF;
+
+  /* Tipografía -- ver frontend/src/assets/fuentes/ (por agregar: IBM Plex, subset latín, woff2) */
+  --fuente-ui: 'IBM Plex Sans', system-ui, sans-serif;
+  --fuente-datos: 'IBM Plex Mono', ui-monospace, monospace;
+  --fuente-encabezado-tabla: 'IBM Plex Sans Condensed', var(--fuente-ui);
+
+  /* Espaciado, base 4px */
+  --espacio-1: 4px;
+  --espacio-2: 8px;
+  --espacio-3: 12px;
+  --espacio-4: 16px;
+  --espacio-6: 24px;
+  --espacio-8: 32px;
+  --espacio-12: 48px;
+  --espacio-16: 64px;
+
+  /* Radius: único para todo el sistema. Excepción: celdas de tabla (0px, ver diseno-ui.md) */
+  --radius: 4px;
+  --radius-celda: 0px;
+
+  /* Sombras: escala corta */
+  --sombra-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --sombra-2: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  /* Densidad de tabla -- alto de fila, seleccionable por el usuario (ver diseno-ui.md) */
+  --fila-compacta: 32px;
+  --fila-media: 40px;
+  --fila-comoda: 56px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--fuente-ui);
+  color: var(--texto-principal);
+  background: var(--superficie);
+  font-size: 14px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accion-700);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Componentes de estado compartidos (shared/componentes/*) -- ver references/diseno-ui.md */
+
+.estado-vacio,
+.estado-error,
+.sin-permiso {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-3);
+  padding: var(--espacio-6);
+  color: var(--texto-secundario);
+}
+
+.estado-vacio button,
+.estado-error button {
+  font-family: var(--fuente-ui);
+  font-size: 14px;
+  padding: var(--espacio-2) var(--espacio-4);
+  border-radius: var(--radius);
+  border: none;
+  background: var(--accion-700);
+  color: var(--superficie);
+  cursor: pointer;
+}
+
+.estado-error {
+  color: var(--reprobado-900);
+}
+
+.estado-cargando {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+  padding: var(--espacio-4);
+}
+
+.estado-cargando__fila {
+  height: var(--fila-media);
+  border-radius: var(--radius);
+  background: var(--fondo-solo-lectura);
+}
+
+.punto-guardado {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pendiente-relleno);
+}
+
+/* features/autenticacion/componentes/login */
+
+.login {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  max-width: 320px;
+  margin: var(--espacio-16) auto;
+  padding: var(--espacio-6);
+}
+
+.login input {
+  font-family: var(--fuente-ui);
+  font-size: 14px;
+  padding: var(--espacio-2) var(--espacio-3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+}
+
+.login button {
+  font-family: var(--fuente-ui);
+  font-size: 14px;
+  padding: var(--espacio-2) var(--espacio-4);
+  border-radius: var(--radius);
+  border: none;
+  background: var(--accion-700);
+  color: var(--superficie);
+  cursor: pointer;
+}
+
+.login button:disabled {
+  background: var(--borde);
+  cursor: not-allowed;
+}
+
+.login__error {
+  color: var(--reprobado-900);
+  font-size: 14px;
+}

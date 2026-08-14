@@ -1,0 +1,7 @@
+<div class="estado-vacio">
+  <!-- TODO: ícono de libro-y-planta del escudo, ver references/diseno-ui.md -->
+  <p>{{ mensaje() }}</p>
+  @if (textoAccion()) {
+    <button type="button" (click)="accion.emit()">{{ textoAccion() }}</button>
+  }
+</div>

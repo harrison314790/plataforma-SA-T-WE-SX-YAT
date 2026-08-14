@@ -1,0 +1,16 @@
+# dependencias
+node_modules/
+
+# build
+dist/
+out-tsc/
+.angular/
+
+# entorno
+.env
+.env.local
+
+# editor / SO
+.vscode/
+.claude/
+.DS_Store
