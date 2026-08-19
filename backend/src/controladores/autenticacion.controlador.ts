@@ -1,10 +1,12 @@
+import type { Request, Response } from 'express';
 import { manejarError } from '../nucleo/manejarError.js';
 import * as autenticacionServicio from '../servicios/autenticacion.servicio.js';
 
-export async function login(req, res) {
-  const { email, password } = req.body;
+export async function login(req: Request, res: Response): Promise<void> {
+  const { email, password } = req.body as { email?: string; password?: string };
   if (!email || !password) {
-    return res.status(400).json({ error: 'Correo y contraseña son obligatorios' });
+    res.status(400).json({ error: 'Correo y contraseña son obligatorios' });
+    return;
   }
   try {
     const resultado = await autenticacionServicio.iniciarSesion({ email, password });

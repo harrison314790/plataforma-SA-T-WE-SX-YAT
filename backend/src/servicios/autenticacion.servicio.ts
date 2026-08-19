@@ -1,14 +1,30 @@
 import { createClient } from '@supabase/supabase-js';
 import { clienteSupabaseConJwt } from '../nucleo/clienteSupabase.js';
 import { ErrorDeBaseDeDatos, ErrorDeNegocio } from '../nucleo/errores.js';
+import type { RespuestaLogin } from '../tipos/dominio.js';
+
+interface Credenciales {
+  email: string;
+  password: string;
+}
+
+interface FilaPerfil {
+  rol_id: number;
+  roles: { nombre: RespuestaLogin['rol'] };
+}
+
+interface FilaPermiso {
+  habilitado: boolean;
+  recursos: { codigo: string };
+}
 
 /**
  * Antes de autenticar no hay JWT que reenviar, así que este es el único
  * lugar del backend donde se usa un cliente "público" (anon key, sin
  * sesión). Ver .claude/skills/sistema-academico/references/node-supabase.md
  */
-export async function iniciarSesion({ email, password }) {
-  const clientePublico = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+export async function iniciarSesion({ email, password }: Credenciales): Promise<RespuestaLogin> {
+  const clientePublico = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
@@ -24,7 +40,7 @@ export async function iniciarSesion({ email, password }) {
     .from('usuarios')
     .select('rol_id, roles(nombre)')
     .eq('id', sesion.user.id)
-    .single();
+    .single<FilaPerfil>();
   if (errorPerfil || !perfil) {
     throw new ErrorDeNegocio('Usuario sin perfil registrado. Contacta al administrador.');
   }
@@ -32,10 +48,11 @@ export async function iniciarSesion({ email, password }) {
   const { data: filasPermisos, error: errorPermisos } = await supabase
     .from('permisos')
     .select('habilitado, recursos(codigo)')
-    .eq('rol_id', perfil.rol_id);
+    .eq('rol_id', perfil.rol_id)
+    .returns<FilaPermiso[]>();
   if (errorPermisos) throw new ErrorDeBaseDeDatos(errorPermisos);
 
-  const permisos = Object.fromEntries(filasPermisos.map((p) => [p.recursos.codigo, p.habilitado]));
+  const permisos = Object.fromEntries((filasPermisos ?? []).map((p) => [p.recursos.codigo, p.habilitado]));
 
   return { jwt, rol: perfil.roles.nombre, permisos };
 }

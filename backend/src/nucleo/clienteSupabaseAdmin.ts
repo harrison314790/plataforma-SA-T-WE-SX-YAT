@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
  * Ver .claude/skills/sistema-academico/references/node-supabase.md
  */
 export const clienteSupabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { persistSession: false, autoRefreshToken: false } },
 );
