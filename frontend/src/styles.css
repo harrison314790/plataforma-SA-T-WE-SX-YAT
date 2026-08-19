@@ -159,7 +159,7 @@ body {
   background: var(--pendiente-relleno);
 }
 
-/* features/autenticacion/componentes/login */
+/* features/autenticacion/pages/login */
 
 .login {
   display: flex;
