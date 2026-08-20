@@ -1,17 +1,109 @@
-<form class="login" [formGroup]="formulario" (ngSubmit)="enviar()">
-  <h1>Sistema Académico</h1>
+<div class="login-pagina">
+  <aside class="login-marca-panel">
+    <div class="login-marca-panel__contenido">
+      <div class="login-marca-panel__medallon">
+        <img class="login-marca-panel__escudo" src="assets/imagenes/iconoSAT.png" alt="Escudo de la institución" />
+      </div>
+      <h1 class="login-marca-panel__titulo">SA´T WE´SX YAT</h1>
+      <p class="login-marca-panel__subtitulo">Sistema Académico</p>
+    </div>
+  </aside>
 
-  <label for="email">Correo</label>
-  <input id="email" type="email" formControlName="email" autocomplete="username" />
+  <main class="login-formulario-panel">
+    <div class="login-formulario-panel__interior">
+      <div class="login-encabezado-movil">
+        <img class="login-encabezado-movil__escudo" src="assets/imagenes/iconoSAT.png" alt="Escudo de la institución" />
+        <div>
+          <p class="login-encabezado-movil__titulo">SA´T WE´SX YAT</p>
+          <p class="login-encabezado-movil__subtitulo">Sistema Académico</p>
+        </div>
+      </div>
 
-  <label for="password">Contraseña</label>
-  <input id="password" type="password" formControlName="password" autocomplete="current-password" />
+      <div class="login-saludo">
+        <p class="login-saludo__eyebrow">Acceso institucional</p>
+        <h2 class="login-saludo__titulo">Inicia sesión</h2>
+      </div>
 
-  @if (error()) {
-    <p class="login__error" role="alert">{{ error() }}</p>
-  }
+      <form class="login-formulario" [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+        <div class="login-campo">
+          <label for="email">Correo</label>
+          <div class="login-campo__control">
+            <svg class="login-campo__icono" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3.5 6.5h17v11h-17z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+              <path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <input
+              id="email"
+              type="email"
+              formControlName="email"
+              autocomplete="username"
+              placeholder="nombre@institucion.edu.co"
+            />
+          </div>
+        </div>
 
-  <button type="submit" [disabled]="formulario.invalid || cargando()">
-    {{ cargando() ? 'Ingresando...' : 'Ingresar' }}
-  </button>
-</form>
+        <div class="login-campo">
+          <label for="password">Contraseña</label>
+          <div class="login-campo__control login-campo__control--password">
+            <svg class="login-campo__icono" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="5" y="10.5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8" />
+              <path d="M8 10.5V8a4 4 0 118 0v2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+            <input
+              id="password"
+              [type]="mostrarPassword() ? 'text' : 'password'"
+              formControlName="password"
+              autocomplete="current-password"
+            />
+            <button
+              type="button"
+              class="login-campo__alternar"
+              (click)="alternarPassword()"
+              [attr.aria-pressed]="mostrarPassword()"
+              [attr.aria-label]="mostrarPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+            >
+              @if (mostrarPassword()) {
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M3 3l18 18M10.6 10.6a2 2 0 002.83 2.83M9.4 5.51A10.4 10.4 0 0112 5.2c5 0 9 3.6 10 6.8a11.6 11.6 0 01-2.42 3.9M6.6 6.7C4.6 8 3 9.9 2 12c1 3.2 5 6.8 10 6.8 1.28 0 2.5-.23 3.6-.66"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M2 12c1-3.2 5-6.8 10-6.8s9 3.6 10 6.8c-1 3.2-5 6.8-10 6.8s-9-3.6-10-6.8z"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linejoin="round"
+                  />
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8" />
+                </svg>
+              }
+            </button>
+          </div>
+        </div>
+
+        @if (error()) {
+          <p class="login__error" role="alert">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
+              <path d="M12 7.5v5.5M12 16.2h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+            {{ error() }}
+          </p>
+        }
+
+        <button type="submit" class="login-enviar" [disabled]="formulario.invalid || cargando()">
+          @if (cargando()) {
+            <span class="login-enviar__spinner" aria-hidden="true"></span>
+          }
+          <span>{{ cargando() ? "Ingresando…" : "Ingresar" }}</span>
+        </button>
+      </form>
+    </div>
+  </main>
+</div>

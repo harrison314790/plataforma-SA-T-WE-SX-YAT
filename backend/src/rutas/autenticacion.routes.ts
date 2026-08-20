@@ -4,5 +4,6 @@ import * as controladorAutenticacion from '../controladores/autenticacion.contro
 const router = Router();
 
 router.post('/login', controladorAutenticacion.login);
+router.post('/refrescar', controladorAutenticacion.refrescar);
 
 export default router;

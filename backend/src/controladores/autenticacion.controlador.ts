@@ -15,3 +15,17 @@ export async function login(req: Request, res: Response): Promise<void> {
     manejarError(err, req, res);
   }
 }
+
+export async function refrescar(req: Request, res: Response): Promise<void> {
+  const { refreshToken } = req.body as { refreshToken?: string };
+  if (!refreshToken) {
+    res.status(400).json({ error: 'refreshToken es obligatorio' });
+    return;
+  }
+  try {
+    const resultado = await autenticacionServicio.refrescarSesion(refreshToken);
+    res.json(resultado);
+  } catch (err) {
+    manejarError(err, req, res);
+  }
+}

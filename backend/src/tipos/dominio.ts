@@ -188,9 +188,18 @@ export interface UsuarioAutenticado {
   sedeId: string | null;
 }
 
-/** Forma exacta que espera AuthService en Angular tras el login (ver frontend/.../auth.service.ts). */
+/**
+ * Forma exacta que espera AuthService en Angular tras el login o el
+ * refresco de sesión (ver frontend/.../auth.service.ts). `refreshToken` y
+ * `expiraEn` son los que le permiten a Angular renovar el JWT antes de
+ * que expire (~1h en Supabase) sin obligar al usuario a loguearse de
+ * nuevo a mitad de una clase -- ver
+ * .claude/skills/sistema-academico/references/node-supabase.md.
+ */
 export interface RespuestaLogin {
   jwt: string;
+  refreshToken: string;
+  expiraEn: string; // ISO 8601
   rol: Rol;
   permisos: Record<string, boolean>;
 }

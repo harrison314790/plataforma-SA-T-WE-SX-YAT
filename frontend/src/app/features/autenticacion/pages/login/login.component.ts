@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -20,11 +21,16 @@ export class LoginComponent {
 
   readonly cargando = signal(false);
   readonly error = signal<string | null>(null);
+  readonly mostrarPassword = signal(false);
 
   readonly formulario = new FormGroup({
     email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
     password: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
   });
+
+  alternarPassword(): void {
+    this.mostrarPassword.update((valor) => !valor);
+  }
 
   async enviar(): Promise<void> {
     if (this.formulario.invalid) return;
@@ -34,8 +40,12 @@ export class LoginComponent {
       const { email, password } = this.formulario.getRawValue();
       await this.auth.iniciarSesion(email, password);
       await this.router.navigateByUrl('/notas');
-    } catch {
-      this.error.set('Correo o contraseña incorrectos.');
+    } catch (err) {
+      // El backend manda un mensaje ya pensado para mostrarse tal cual
+      // (ErrorDeNegocio, ver manejarError.ts) -- solo cae al genérico si
+      // no hay body de error (por ejemplo, el backend no respondió).
+      const mensaje = err instanceof HttpErrorResponse ? (err.error as { error?: string } | null)?.error : undefined;
+      this.error.set(mensaje ?? 'No se pudo iniciar sesión. Intenta de nuevo.');
     } finally {
       this.cargando.set(false);
     }

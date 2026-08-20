@@ -161,40 +161,383 @@ body {
 
 /* features/autenticacion/pages/login */
 
-.login {
+/*
+  Layout de dos paneles (patrón login de ERP: Stripe/Linear, no landing
+  page). El panel de marca es el único lugar del login con color de
+  identidad y es donde vive el fondo ilustrado; el panel de formulario se
+  queda neutro para no competir con los campos. En móvil el panel de marca
+  se oculta entero (menos CSS pintado = mejor para gama baja) y se
+  reemplaza por un encabezado compacto dentro del panel de formulario.
+*/
+
+.login-pagina {
   display: flex;
   flex-direction: column;
-  gap: var(--espacio-3);
+  min-height: 100vh;
+  background: var(--superficie);
+}
+
+/*
+  Fondo del panel de marca: atardecer sobre la cordillera, con el mismo par
+  estrella + montañas del escudo (ver diseno-ui.md), solo en rampa
+  --marca-*. Nunca turquesa/verde/amarillo/rojo acá -- esos tonos están
+  reservados a interacción y a estado de nota, y usarlos acá rompería esa
+  señal en el resto del sistema. Todo estático (sin animación), formas por
+  clip-path/gradient, nada de blur -- coherente con el piso de rendimiento
+  para gama baja.
+*/
+
+.login-marca-panel {
+  display: none;
+  position: relative;
+  overflow: hidden;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--espacio-8);
+  background:
+    radial-gradient(1px 1px at 6% 14%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 14% 26%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1px 1px at 23% 10%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1px 1px at 31% 20%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 40% 12%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1px 1px at 52% 24%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1px 1px at 61% 9%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 70% 18%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1px 1px at 78% 27%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1px 1px at 85% 13%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 92% 22%, var(--marca-100) 50%, transparent 51%),
+    radial-gradient(1px 1px at 45% 34%, var(--marca-100) 50%, transparent 51%),
+    linear-gradient(
+      180deg,
+      var(--marca-900) 0%,
+      var(--marca-700) 34%,
+      var(--marca-500) 58%,
+      var(--marca-100) 84%,
+      var(--superficie) 100%
+    );
+}
+
+.login-marca-panel::before,
+.login-marca-panel::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* cordillera lejana */
+.login-marca-panel::before {
+  height: 38vh;
+  min-height: 220px;
+  background: var(--marca-300);
+  opacity: 0.55;
+  clip-path: polygon(
+    0% 62%, 8% 46%, 18% 58%, 30% 32%, 42% 53%,
+    55% 24%, 68% 49%, 80% 36%, 92% 56%, 100% 42%,
+    100% 100%, 0% 100%
+  );
+}
+
+/* cordillera cercana */
+.login-marca-panel::after {
+  height: 24vh;
+  min-height: 140px;
+  background: var(--marca-900);
+  clip-path: polygon(
+    0% 72%, 12% 52%, 24% 66%, 38% 40%, 50% 61%,
+    64% 34%, 78% 59%, 90% 44%, 100% 63%, 100% 100%,
+    0% 100%
+  );
+}
+
+.login-marca-panel__contenido {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   max-width: 320px;
-  margin: var(--espacio-16) auto;
+}
+
+/*
+  El escudo trae sus propios colores heráldicos (amarillo, rojo, cian,
+  verde) que chocarían sueltos sobre el atardecer morado. El medallón lo
+  asienta como una insignia montada en vez de un logo flotando: resuelve
+  el choque de color y además es el tratamiento correcto para un escudo.
+*/
+.login-marca-panel__medallon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 168px;
+  height: 168px;
+  border-radius: 50%;
+  margin-bottom: var(--espacio-6);
+  background: radial-gradient(circle at 50% 38%, var(--marca-050) 0%, var(--marca-100) 55%, var(--marca-300) 100%);
+  box-shadow: var(--sombra-2);
+}
+
+.login-marca-panel__escudo {
+  width: 128px;
+  height: 128px;
+}
+
+.login-marca-panel__titulo {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--superficie);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.login-marca-panel__subtitulo {
+  margin: var(--espacio-2) 0 0;
+  font-size: 14px;
+  color: var(--marca-100);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.login-formulario-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: var(--espacio-6);
 }
 
-.login input {
+.login-formulario-panel__interior {
+  width: 100%;
+  max-width: 380px;
+}
+
+.login-encabezado-movil {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+  margin-bottom: var(--espacio-8);
+}
+
+.login-encabezado-movil__escudo {
+  width: 48px;
+  height: 48px;
+  flex: none;
+}
+
+.login-encabezado-movil__titulo {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--marca-900);
+}
+
+.login-encabezado-movil__subtitulo {
+  margin: 0;
+  font-size: 12px;
+  color: var(--texto-secundario);
+}
+
+.login-saludo {
+  margin-bottom: var(--espacio-6);
+}
+
+.login-saludo__eyebrow {
+  margin: 0 0 var(--espacio-1);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--texto-secundario);
+}
+
+.login-saludo__titulo {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--texto-principal);
+}
+
+@media (min-width: 880px) {
+  .login-pagina {
+    flex-direction: row;
+  }
+
+  .login-marca-panel {
+    display: flex;
+    flex: 0 0 42%;
+    max-width: 560px;
+  }
+
+  .login-encabezado-movil {
+    display: none;
+  }
+
+  .login-formulario-panel {
+    padding: var(--espacio-16);
+  }
+}
+
+.login-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-4);
+}
+
+.login-campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+}
+
+.login-campo label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--texto-principal);
+}
+
+.login-campo input {
+  width: 100%;
   font-family: var(--fuente-ui);
   font-size: 14px;
   padding: var(--espacio-2) var(--espacio-3);
   border: 1px solid var(--borde);
   border-radius: var(--radius);
+  background: var(--superficie);
+  color: var(--texto-principal);
+  transition: border-color 120ms ease;
 }
 
-.login button {
+.login-campo input:hover {
+  border-color: var(--accion-300);
+}
+
+.login-campo input:focus-visible {
+  border-color: var(--accion-700);
+}
+
+.login-campo__control {
+  position: relative;
+  display: flex;
+}
+
+.login-campo__control input {
+  padding-left: 38px;
+}
+
+.login-campo__control--password input {
+  padding-right: var(--espacio-8);
+}
+
+.login-campo__icono {
+  position: absolute;
+  top: 50%;
+  left: var(--espacio-3);
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--texto-secundario);
+  pointer-events: none;
+  transition: color 120ms ease;
+}
+
+.login-campo__control:focus-within .login-campo__icono {
+  color: var(--accion-700);
+}
+
+.login-campo__alternar {
+  position: absolute;
+  top: 50%;
+  right: var(--espacio-1);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--texto-secundario);
+  cursor: pointer;
+}
+
+.login-campo__alternar svg {
+  width: 18px;
+  height: 18px;
+}
+
+.login-campo__alternar:hover {
+  color: var(--accion-700);
+  background: var(--accion-050);
+}
+
+.login-enviar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espacio-2);
   font-family: var(--fuente-ui);
   font-size: 14px;
-  padding: var(--espacio-2) var(--espacio-4);
+  font-weight: 500;
+  padding: var(--espacio-3) var(--espacio-4);
   border-radius: var(--radius);
   border: none;
   background: var(--accion-700);
   color: var(--superficie);
   cursor: pointer;
+  margin-top: var(--espacio-2);
 }
 
-.login button:disabled {
+.login-enviar:hover:not(:disabled) {
+  background: var(--accion-900);
+}
+
+.login-enviar:disabled {
   background: var(--borde);
+  color: var(--texto-secundario);
   cursor: not-allowed;
 }
 
+/* currentColor: hereda el color de texto del botón en cualquier estado, así
+   nunca queda un spinner blanco invisible sobre el fondo gris deshabilitado. */
+.login-enviar__spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: login-girar 0.6s linear infinite;
+}
+
+@keyframes login-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .login__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espacio-2);
+  margin: 0;
+  padding: var(--espacio-2) var(--espacio-3);
+  border-radius: var(--radius);
+  background: var(--reprobado-050);
   color: var(--reprobado-900);
-  font-size: 14px;
+  font-size: 13px;
+}
+
+.login__error svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
 }
