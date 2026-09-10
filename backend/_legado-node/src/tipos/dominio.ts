@@ -1,12 +1,22 @@
 /**
  * Tipos que reflejan el esquema real de Supabase -- ver
- * backend/01-esquema-inicial_1.sql (tablas), backend/02-politicas-rls.sql
- * (RLS) y backend/03-datos-prueba.sql (datos de ejemplo: Marta Ríos
- * profesora de Matemáticas 9-B en Escuela La Laguna, Luis Pérez uno de
- * sus estudiantes). Todas las llaves primarias son `uuid`, no `bigint`.
+ * backend/01-esquema-inicial_1.sql (tablas), backend/02-politicas-rls_1.sql
+ * (RLS, incluye la migración backend/04-super-admin.sql) y
+ * backend/03-datos-prueba_1.sql (datos de ejemplo: Marta Ríos profesora
+ * de Matemáticas 9-B en Escuela La Laguna, Luis Pérez uno de sus
+ * estudiantes). Todas las llaves primarias son `uuid`, no `bigint`.
  */
 
-export type Rol = 'admin' | 'profesor' | 'estudiante';
+/**
+ * `super_admin` es superconjunto de `admin` (ver fn_es_admin() en RLS:
+ * ahora incluye a los dos) -- pensado como el operador del producto (el
+ * dueño de la instalación), no para el personal de una sede. `admin` es
+ * para secretarias/rectores/coordinadores: gestiona lo operativo del día
+ * a día (usuarios, sedes, períodos, matrículas) pero no puede tocar
+ * `roles`/`recursos`/`permisos` ni asignar/editar cuentas `super_admin` --
+ * ver .claude/skills/sistema-academico/references/permisos.md.
+ */
+export type Rol = 'super_admin' | 'admin' | 'profesor' | 'estudiante';
 
 export type TipoSede = 'principal' | 'vereda';
 

@@ -1,12 +1,20 @@
 -- ═══════════════════════════════════════════════════════════
--- Sistema Académico — Políticas RLS
+-- Sistema Académico — Políticas RLS (Postgres puro)
 -- Correr DESPUÉS de 01-esquema-inicial.sql
 -- Caso de referencia: Marta Ríos (profesora, Matemáticas 9-B,
 -- Escuela La Laguna) y Luis Pérez (estudiante, 9-B, 2026-1)
+--
+-- Ya incluye el rol super_admin integrado — no hace falta
+-- correr ningún archivo de migración aparte para eso.
 -- ═══════════════════════════════════════════════════════════
 
 -- ─────────────────────────────────────────────
 -- FUNCIONES AUXILIARES
+-- Postgres puro no tiene auth.uid() (eso era de Supabase Auth).
+-- En su lugar, Node le dice a Postgres quién es el usuario en
+-- cada consulta con `SET LOCAL app.usuario_id = '<uuid>'`, y
+-- estas funciones leen esa variable de sesión.
+--
 -- SECURITY DEFINER: leen `usuarios` saltándose su propio RLS,
 -- para no caer en recursión (una política de `usuarios` que
 -- necesita leer `usuarios` para evaluarse a sí misma).
@@ -14,35 +22,42 @@
 -- consulta en vez de re-ejecutarlas por cada fila.
 -- ─────────────────────────────────────────────
 
+-- El id YA es lo que Node puso en la sesión — no hace falta
+-- join ni SECURITY DEFINER, no hay ninguna tabla de la que
+-- "escaparse" acá.
 create or replace function fn_usuario_id_actual() returns uuid
-language sql stable security definer set search_path = public as $$
-  select id from usuarios where auth_id = auth.uid();
+language sql stable as $$
+  select current_setting('app.usuario_id', true)::uuid;
 $$;
 
 create or replace function fn_rol_actual() returns text
 language sql stable security definer set search_path = public as $$
   select r.nombre from usuarios u
   join roles r on r.id = u.rol_id
-  where u.auth_id = auth.uid();
+  where u.id = fn_usuario_id_actual();
 $$;
 
 create or replace function fn_es_admin() returns boolean
 language sql stable security definer set search_path = public as $$
-  select fn_rol_actual() = 'admin';
+  select fn_rol_actual() in ('admin', 'super_admin');
+$$;
+
+-- super_admin es superconjunto de admin (todo lo que admin puede,
+-- más el control exclusivo de recursos/permisos/roles). Esta
+-- función distingue el caso exclusivo.
+create or replace function fn_es_super_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select fn_rol_actual() = 'super_admin';
 $$;
 
 create or replace function fn_estudiante_id_actual() returns uuid
 language sql stable security definer set search_path = public as $$
-  select e.id from estudiantes e
-  join usuarios u on u.id = e.usuario_id
-  where u.auth_id = auth.uid();
+  select id from estudiantes where usuario_id = fn_usuario_id_actual();
 $$;
 
 create or replace function fn_profesor_id_actual() returns uuid
 language sql stable security definer set search_path = public as $$
-  select p.id from profesores p
-  join usuarios u on u.id = p.usuario_id
-  where u.auth_id = auth.uid();
+  select id from profesores where usuario_id = fn_usuario_id_actual();
 $$;
 
 -- Marta: fn_profesor_id_actual() = su id de profesora.
@@ -79,8 +94,8 @@ alter table documentos             enable row level security;
 
 create policy "roles_lectura" on roles for select
   to authenticated using (true);
-create policy "roles_admin_escribe" on roles for all
-  to authenticated using (fn_es_admin()) with check (fn_es_admin());
+create policy "roles_superadmin_escribe" on roles for all
+  to authenticated using (fn_es_super_admin()) with check (fn_es_super_admin());
 
 create policy "sedes_lectura" on sedes for select
   to authenticated using (true);
@@ -97,15 +112,18 @@ create policy "periodos_lectura" on periodos_academicos for select
 create policy "periodos_admin_escribe" on periodos_academicos for all
   to authenticated using (fn_es_admin()) with check (fn_es_admin());
 
+-- recursos y permisos: EXCLUSIVO de super_admin. Es el control
+-- por plan — un admin normal (secretaria/rector) no puede
+-- activar un módulo que su colegio no pagó.
 create policy "recursos_lectura" on recursos for select
   to authenticated using (true);
-create policy "recursos_admin_escribe" on recursos for all
-  to authenticated using (fn_es_admin()) with check (fn_es_admin());
+create policy "recursos_superadmin_escribe" on recursos for all
+  to authenticated using (fn_es_super_admin()) with check (fn_es_super_admin());
 
 create policy "permisos_lectura" on permisos for select
   to authenticated using (true);
-create policy "permisos_admin_escribe" on permisos for all
-  to authenticated using (fn_es_admin()) with check (fn_es_admin());
+create policy "permisos_superadmin_escribe" on permisos for all
+  to authenticated using (fn_es_super_admin()) with check (fn_es_super_admin());
 
 -- ─────────────────────────────────────────────
 -- USUARIOS
@@ -114,10 +132,31 @@ create policy "permisos_admin_escribe" on permisos for all
 -- ─────────────────────────────────────────────
 
 create policy "usuarios_ve_su_fila" on usuarios for select
-  to authenticated using (auth_id = auth.uid() or fn_es_admin());
+  to authenticated using (id = fn_usuario_id_actual() or fn_es_admin());
 
-create policy "usuarios_admin_gestiona" on usuarios for all
-  to authenticated using (fn_es_admin()) with check (fn_es_admin());
+-- super_admin gestiona cualquier usuario sin restricción.
+create policy "usuarios_superadmin_gestiona" on usuarios for all
+  to authenticated using (fn_es_super_admin()) with check (fn_es_super_admin());
+
+-- admin normal gestiona usuarios, PERO no puede asignar el rol
+-- super_admin a nadie, ni tocar la fila de alguien que ya lo es.
+-- Sin esto, cualquier admin podría autoascenderse.
+create policy "usuarios_admin_inserta" on usuarios for insert
+  to authenticated with check (
+    fn_es_admin()
+    and rol_id <> (select id from roles where nombre = 'super_admin')
+  );
+
+create policy "usuarios_admin_actualiza" on usuarios for update
+  to authenticated
+  using (
+    fn_es_admin()
+    and rol_id <> (select id from roles where nombre = 'super_admin')
+  )
+  with check (
+    fn_es_admin()
+    and rol_id <> (select id from roles where nombre = 'super_admin')
+  );
 
 -- ─────────────────────────────────────────────
 -- ESTUDIANTES
@@ -296,50 +335,23 @@ create policy "notas_profesor_inserta_dentro_de_plazo" on notas for insert
     )
   );
 
--- La misma regla aplica para EDITAR una nota ya cargada.
-create policy "notas_profesor_actualiza_dentro_de_plazo" on notas for update
-  to authenticated
-  using (
-    exists (
-      select 1 from asignaciones a
-      where a.id = notas.asignacion_id
-        and a.profesor_id = fn_profesor_id_actual()
-    )
-  )
-  with check (
-    exists (
-      select 1 from asignaciones a
-      where a.id = asignacion_id
-        and a.profesor_id = fn_profesor_id_actual()
-    )
-    and (
-      exists (
-        select 1 from asignaciones a
-        join periodos_academicos p on p.id = a.periodo_id
-        where a.id = asignacion_id
-          and p.notas_habilitadas = true
-          and now() <= p.fecha_limite_notas
-      )
-      or exists (
-        select 1 from excepciones_plazo ex
-        where ex.asignacion_id = notas.asignacion_id
-          and ex.profesor_id = fn_profesor_id_actual()
-          and now() <= ex.fecha_limite_extendida
-      )
-    )
-  );
+-- El profesor NO puede editar una nota una vez cargada. Solo la
+-- inserta una vez (la restricción UNIQUE de la tabla `notas` ya
+-- impide una segunda inserción). Cualquier corrección después de
+-- eso exige reportarse personalmente con el rector/coordinador,
+-- que la edita desde su cuenta admin — sin importar el plazo del
+-- período. Por eso acá NO hay política de UPDATE para profesor.
 
 -- Admin puede todo, incluida corrección fuera de plazo
 -- por una reclamación resuelta.
 create policy "notas_admin_gestiona" on notas for all
   to authenticated using (fn_es_admin()) with check (fn_es_admin());
 
--- Nadie borra una nota, ni siquiera admin, ni siquiera vía
--- panel de Supabase con un rol autenticado normal. Una nota
--- mal cargada se CORRIGE (queda el update en notas_historial
--- cuando agreguemos esa tabla), nunca desaparece sin rastro.
--- No se crea política de DELETE a propósito: sin una política
--- que la permita, la operación queda bloqueada por RLS.
+-- Nadie borra una nota, ni siquiera admin. Una nota mal cargada
+-- se CORRIGE (queda el update en notas_historial cuando
+-- agreguemos esa tabla), nunca desaparece sin rastro. No se crea
+-- política de DELETE a propósito: sin una política que la
+-- permita, la operación queda bloqueada por RLS.
 
 -- ─────────────────────────────────────────────
 -- DOCUMENTOS
@@ -354,18 +366,21 @@ create policy "documentos_admin_gestiona" on documentos for insert
   to authenticated with check (fn_es_admin());
 
 -- ═══════════════════════════════════════════════════════════
--- Verificación rápida después de correr esto:
+-- Verificación rápida después de correr esto (probar desde
+-- Node con consultaComoUsuario(), no desde TablePlus/postgres,
+-- porque ese usuario salta RLS):
 --
--- 1. Con el JWT de Luis: select * from notas;
+-- 1. Con la sesión de Luis: select * from notas;
 --    -> debe devolver solo las notas donde estudiante_id = Luis.
 --
--- 2. Con el JWT de Marta: intentar
+-- 2. Con la sesión de Marta: intentar
 --    insert into notas (estudiante_id, asignacion_id, valor,
 --    registrado_por) values (<id de un estudiante que NO es
 --    suyo>, <su propia asignación>, 4.0, <su usuario_id>);
 --    -> debe fallar, aunque el insert esté bien formado.
 --
--- 3. Con el JWT de Marta, después de vencido fecha_limite_notas
---    y sin excepción vigente: el mismo insert sobre un
---    estudiante que SÍ es suyo -> debe fallar igual.
+-- 3. Con la sesión de Marta, después de vencido
+--    fecha_limite_notas y sin excepción vigente: el mismo
+--    insert sobre un estudiante que SÍ es suyo -> debe fallar
+--    igual.
 -- ═══════════════════════════════════════════════════════════

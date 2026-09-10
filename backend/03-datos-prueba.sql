@@ -1,67 +1,63 @@
 -- ═══════════════════════════════════════════════════════════
--- Sistema Académico — Datos de prueba
--- Correr DESPUÉS de 01-esquema-inicial.sql y 02-politicas-rls.sql
+-- Sistema Académico — Datos de prueba (Postgres puro)
+-- Correr DESPUÉS de 01-esquema-inicial.sql, 02-politicas-rls.sql
+-- y 04-login-function.sql.
 --
--- El SQL Editor de Supabase corre como el rol `postgres`, que
--- salta el RLS. Por eso este script puede insertar directo sin
--- pelear con las políticas — pero la app real SIEMPRE pasará
--- por ellas. Este script es solo para poblar de prueba.
+-- Corré esto conectado como el superusuario 'postgres' — salta
+-- RLS, así que puede insertar directo sin pelear con políticas.
+--
+-- Contraseña de prueba para TODOS: Prueba123!
+--
+-- Novedades de esta versión:
+--  - roles, sedes, asignaturas, periodos_academicos y recursos
+--    ya no llevan id explícito: se generan solos (1, 2, 3...).
+--  - Se agrega un usuario con rol 'admin' (antes solo existía
+--    super_admin, faltaba probar el rol operativo).
+--  - Ahora hay estudiantes y asignaciones en TRES grados
+--    distintos (9-B, 8-A, 10-A), no solo uno, para probar que
+--    el filtrado por grado funciona de verdad.
 -- ═══════════════════════════════════════════════════════════
 
 -- ─────────────────────────────────────────────
--- PASO 0 — Crear estos usuarios ANTES de correr el resto.
--- Dashboard → Authentication → Users → Add user
--- Marcar "Auto Confirm User" en cada uno.
---
---  email                        password      rol
---  admin@sedeprincipal.edu.co   Prueba123!    admin
---  marta.rios@sedeprincipal.edu.co   Prueba123!   profesor
---  carlos.medina@sedeprincipal.edu.co Prueba123!  profesor
---  luis.perez@sedeprincipal.edu.co    Prueba123!  estudiante
---  daniela.chocue@sedeprincipal.edu.co Prueba123! estudiante
---  valeria.mestizo@sedeprincipal.edu.co Prueba123! estudiante
---
--- El script busca sus id por email, así que no hace falta
--- copiar ningún UUID a mano.
--- ─────────────────────────────────────────────
-
--- ─────────────────────────────────────────────
--- 1. ROLES
+-- 1. ROLES — sin id explícito, se autoasignan 1, 2, 3, 4
 -- ─────────────────────────────────────────────
 insert into roles (nombre) values
-  ('admin'), ('profesor'), ('estudiante')
+  ('super_admin'), ('admin'), ('profesor'), ('estudiante')
 on conflict (nombre) do nothing;
 
 -- ─────────────────────────────────────────────
--- 2. SEDES — principal + una vereda, jerárquicas
+-- 2. SEDES — principal + dos veredas, jerárquicas.
+-- Sede Principal se inserta primero para poder referenciar su
+-- id (ya no es un UUID fijo, es el entero que le tocó al nacer).
 -- ─────────────────────────────────────────────
-insert into sedes (id, nombre, tipo, vereda, sede_padre_id) values
-  ('a0000000-0000-0000-0000-000000000001', 'Sede Principal', 'principal', null, null);
-
 insert into sedes (nombre, tipo, vereda, sede_padre_id) values
-  ('Escuela La Laguna', 'vereda', 'La Laguna',
-   'a0000000-0000-0000-0000-000000000001'),
-  ('Escuela Guaitalá', 'vereda', 'Guaitalá',
-   'a0000000-0000-0000-0000-000000000001');
+  ('Sede Principal', 'principal', null, null);
+
+insert into sedes (nombre, tipo, vereda, sede_padre_id)
+select 'Escuela La Laguna', 'vereda', 'La Laguna', id from sedes where nombre = 'Sede Principal'
+union all
+select 'Escuela Guaitalá', 'vereda', 'Guaitalá', id from sedes where nombre = 'Sede Principal';
 
 -- ─────────────────────────────────────────────
--- 3. USUARIOS — enlazados a los auth.users del Paso 0 por email
+-- 3. USUARIOS — incluye el admin operativo que faltaba (Yolanda)
+-- y dos estudiantes nuevos en grados distintos a 9-B.
 -- ─────────────────────────────────────────────
-insert into usuarios (auth_id, rol_id, sede_id, nombres, apellidos, documento)
-select u.id,
-       (select id from roles where nombre = datos.rol),
+insert into usuarios (rol_id, sede_id, nombres, apellidos, documento, email, password_hash)
+select (select id from roles where nombre = datos.rol),
        (select id from sedes where nombre = datos.sede),
-       datos.nombres, datos.apellidos, datos.documento
-from auth.users u
-join (values
-  ('admin@sedeprincipal.edu.co',        'admin',      'Sede Principal',    'Harrison', 'Medina',  '10000001'),
-  ('marta.rios@sedeprincipal.edu.co',   'profesor',   'Escuela La Laguna', 'Marta',    'Ríos',    '10000002'),
-  ('carlos.medina@sedeprincipal.edu.co','profesor',   'Escuela La Laguna', 'Carlos',   'Medina',  '10000003'),
-  ('luis.perez@sedeprincipal.edu.co',   'estudiante', 'Escuela La Laguna', 'Luis',     'Pérez',   '10000004'),
-  ('daniela.chocue@sedeprincipal.edu.co','estudiante','Escuela La Laguna', 'Daniela',  'Chocué',  '10000005'),
-  ('valeria.mestizo@sedeprincipal.edu.co','estudiante','Escuela La Laguna','Valeria',  'Mestizo', '10000006')
-) as datos(email, rol, sede, nombres, apellidos, documento)
-  on datos.email = u.email
+       datos.nombres, datos.apellidos, datos.documento, datos.email,
+       crypt('Prueba123!', gen_salt('bf'))
+from (values
+  ('super_admin','Sede Principal',    'Harrison', 'Medina',   '10000001', 'admin@sedeprincipal.edu.co'),
+  ('admin',      'Sede Principal',    'Yolanda',  'Guasaquillo','10000007', 'secretaria@sedeprincipal.edu.co'),
+  ('profesor',   'Escuela La Laguna', 'Marta',    'Ríos',     '10000002', 'marta.rios@sedeprincipal.edu.co'),
+  ('profesor',   'Escuela La Laguna', 'Carlos',   'Medina',   '10000003', 'carlos.medina@sedeprincipal.edu.co'),
+  ('estudiante', 'Escuela La Laguna', 'Luis',     'Pérez',    '10000004', 'luis.perez@sedeprincipal.edu.co'),
+  ('estudiante', 'Escuela La Laguna', 'Daniela',  'Chocué',   '10000005', 'daniela.chocue@sedeprincipal.edu.co'),
+  ('estudiante', 'Escuela La Laguna', 'Valeria',  'Mestizo',  '10000006', 'valeria.mestizo@sedeprincipal.edu.co'),
+  ('estudiante', 'Escuela La Laguna', 'Andrés',   'Yule',     '10000008', 'andres.yule@sedeprincipal.edu.co'),
+  ('estudiante', 'Escuela La Laguna', 'Camila',   'Tumiña',   '10000009', 'camila.tumina@sedeprincipal.edu.co')
+) as datos(rol, sede, nombres, apellidos, documento, email)
 on conflict (documento) do nothing;
 
 -- ─────────────────────────────────────────────
@@ -72,7 +68,7 @@ select id from usuarios where documento in ('10000002','10000003');
 
 insert into estudiantes (usuario_id)
 select id from usuarios
-where documento in ('10000004','10000005','10000006');
+where documento in ('10000004','10000005','10000006','10000008','10000009');
 
 -- ─────────────────────────────────────────────
 -- 5. ACUDIENTES — uno para Luis, uno compartido por dos hermanas
@@ -100,9 +96,7 @@ insert into asignaturas (nombre, codigo) values
   ('Ciencias Naturales', 'CNA');
 
 -- ─────────────────────────────────────────────
--- 7. PERÍODOS — dos cerrados, uno activo, uno futuro.
--- Fechas relativas a hoy para que la demo sea válida sin
--- importar cuándo corras este script.
+-- 7. PERÍODOS — dos cerrados, uno activo, uno futuro
 -- ─────────────────────────────────────────────
 insert into periodos_academicos
   (nombre, anio, numero, fecha_inicio, fecha_fin, fecha_limite_notas, notas_habilitadas, activo)
@@ -121,30 +115,48 @@ values
    current_date + interval '95 days',  true,  false);
 
 -- ─────────────────────────────────────────────
--- 8. ASIGNACIONES — Marta con Matemáticas, Carlos con Español,
--- ambos en 9-B, Escuela La Laguna, en los 4 períodos.
+-- 8. ASIGNACIONES — AHORA con tres grados distintos:
+-- Marta (Matemáticas) dicta en 9-B Y en 8-A.
+-- Carlos (Español) dicta en 9-B Y en 10-A.
+-- Cada combinación profesor+grado se repite en los 4 períodos.
 -- ─────────────────────────────────────────────
 insert into asignaciones (profesor_id, asignatura_id, sede_id, grado, periodo_id)
-select p.id, a.id, s.id, '9-B', per.id
-from profesores p
-join usuarios up on up.id = p.usuario_id
-join asignaturas a on a.codigo = case when up.documento = '10000002' then 'MAT' else 'ESP' end
-join sedes s on s.nombre = 'Escuela La Laguna'
-cross join periodos_academicos per
-where up.documento in ('10000002','10000003');
-
--- ─────────────────────────────────────────────
--- 9. MATRÍCULAS — los tres estudiantes, en 9-B, en cada período
--- ─────────────────────────────────────────────
-insert into matriculas (estudiante_id, sede_id, grado, periodo_id)
-select e.id, s.id, '9-B', per.id
-from estudiantes e
+select p.id, a.id, s.id, datos.grado, per.id
+from (values
+  ('10000002', 'MAT', '9-B'),
+  ('10000002', 'MAT', '8-A'),
+  ('10000003', 'ESP', '9-B'),
+  ('10000003', 'ESP', '10-A')
+) as datos(documento, codigo_asignatura, grado)
+join usuarios up on up.documento = datos.documento
+join profesores p on p.usuario_id = up.id
+join asignaturas a on a.codigo = datos.codigo_asignatura
 join sedes s on s.nombre = 'Escuela La Laguna'
 cross join periodos_academicos per;
 
 -- ─────────────────────────────────────────────
--- 10. EXCEPCIÓN DE PLAZO — Carlos, período activo, 10 días extra
--- por conectividad en la vereda.
+-- 9. MATRÍCULAS — cada estudiante en SU grado correspondiente,
+-- no todos en el mismo.
+-- ─────────────────────────────────────────────
+insert into matriculas (estudiante_id, sede_id, grado, periodo_id)
+select e.id, s.id, datos.grado, per.id
+from (values
+  ('10000004', '9-B'),   -- Luis
+  ('10000005', '9-B'),   -- Daniela
+  ('10000006', '9-B'),   -- Valeria
+  ('10000008', '8-A'),   -- Andrés
+  ('10000009', '10-A')   -- Camila
+) as datos(documento, grado)
+join usuarios u on u.documento = datos.documento
+join estudiantes e on e.usuario_id = u.id
+join sedes s on s.nombre = 'Escuela La Laguna'
+cross join periodos_academicos per;
+
+-- ─────────────────────────────────────────────
+-- 10. EXCEPCIÓN DE PLAZO — Carlos, período activo, SOLO su
+-- asignación de 9-B (ahora que tiene dos asignaciones activas
+-- en el mismo período, hay que ser explícito con el grado para
+-- no crear la excepción sobre las dos por accidente).
 -- ─────────────────────────────────────────────
 insert into excepciones_plazo (profesor_id, asignacion_id, periodo_id, fecha_limite_extendida, autorizado_por, motivo)
 select p.id, asg.id, per.id,
@@ -154,38 +166,46 @@ select p.id, asg.id, per.id,
 from profesores p
 join usuarios up on up.id = p.usuario_id and up.documento = '10000003'
 join periodos_academicos per on per.nombre = '2026-3'
-join asignaciones asg on asg.profesor_id = p.id and asg.periodo_id = per.id;
+join asignaciones asg on asg.profesor_id = p.id
+                      and asg.periodo_id = per.id
+                      and asg.grado = '9-B';   -- explícito: solo esta, no la de 10-A
 
 -- ─────────────────────────────────────────────
 -- 11. NOTAS
--- 2026-1 y 2026-2 (cerrados): todos con nota, una en revisión.
--- 2026-3 (activo): solo Daniela ya tiene nota — Luis y Valeria
--- quedan SIN fila, que es como el sistema representa "pendiente"
--- (ver diseño de la grilla: celda vacía = pendiente).
+-- 9-B: Luis, Daniela, Valeria (Matemáticas, con Marta) — igual
+-- que antes. Se agregan notas de Andrés (8-A, con Marta) y
+-- Camila (10-A, con Carlos) para probar cruce de grados.
 -- ─────────────────────────────────────────────
 insert into notas (estudiante_id, asignacion_id, valor, en_revision, registrado_por)
-select e.id, asg.id, datos.valor, datos.revision,
-       (select up.id from usuarios up where up.documento = '10000002')
+select e.id, asg.id, datos.valor, datos.revision, prof_usuario.id
 from (values
-  ('10000004','2026-1', 4.2, false),
-  ('10000005','2026-1', 4.8, false),
-  ('10000006','2026-1', 4.0, false),
-  ('10000004','2026-2', 3.8, false),
-  ('10000005','2026-2', 4.5, true),   -- en revisión
-  ('10000006','2026-2', 3.6, false),
-  ('10000005','2026-3', 4.9, false)   -- solo ella tiene nota del período activo
-) as datos(documento, periodo, valor, revision)
-join usuarios ue on ue.documento = datos.documento
+  -- 9-B, Matemáticas con Marta
+  ('10000004','2026-1','MAT','9-B', 4.2, false),
+  ('10000005','2026-1','MAT','9-B', 4.8, false),
+  ('10000006','2026-1','MAT','9-B', 4.0, false),
+  ('10000004','2026-2','MAT','9-B', 3.8, false),
+  ('10000005','2026-2','MAT','9-B', 4.5, true),    -- en revisión
+  ('10000006','2026-2','MAT','9-B', 3.6, false),
+  ('10000005','2026-3','MAT','9-B', 4.9, false),   -- período activo
+  -- 8-A, Matemáticas con Marta (grado distinto)
+  ('10000008','2026-1','MAT','8-A', 3.5, false),
+  ('10000008','2026-2','MAT','8-A', 4.1, false),
+  -- 10-A, Español con Carlos (otro profesor, otro grado)
+  ('10000009','2026-1','ESP','10-A', 4.6, false),
+  ('10000009','2026-2','ESP','10-A', 4.3, false)
+) as datos(documento_estudiante, periodo, codigo_asignatura, grado, valor, revision)
+join usuarios ue on ue.documento = datos.documento_estudiante
 join estudiantes e on e.usuario_id = ue.id
 join periodos_academicos per on per.nombre = datos.periodo
+join asignaturas asig on asig.codigo = datos.codigo_asignatura
 join asignaciones asg on asg.periodo_id = per.id
-  and asg.profesor_id = (select pr.id from profesores pr
-                          join usuarios upp on upp.id = pr.usuario_id
-                          where upp.documento = '10000002');  -- Marta, Matemáticas
+                      and asg.asignatura_id = asig.id
+                      and asg.grado = datos.grado
+join profesores prof on prof.id = asg.profesor_id
+join usuarios prof_usuario on prof_usuario.id = prof.usuario_id;
 
 -- ─────────────────────────────────────────────
--- 12. RECURSOS Y PERMISOS — catálogo mínimo para probar
--- el mecanismo de *appHasRole en Angular.
+-- 12. RECURSOS Y PERMISOS
 -- ─────────────────────────────────────────────
 insert into recursos (codigo, tipo, descripcion, modulo) values
   ('btn_registrar_nota',   'boton', 'Registrar o editar una nota',        'notas'),
@@ -212,7 +232,7 @@ join roles r on r.nombre = datos.rol
 join recursos rec on rec.codigo = datos.codigo;
 
 -- ─────────────────────────────────────────────
--- 13. DOCUMENTOS — un ejemplo, sin archivo real
+-- 13. DOCUMENTOS
 -- ─────────────────────────────────────────────
 insert into documentos (estudiante_id, tipo_documento, storage_path, subido_por)
 select e.id, 'registro_civil', 'documentos/luis-perez/registro-civil.pdf',
@@ -221,27 +241,34 @@ from estudiantes e join usuarios u on u.id = e.usuario_id
 where u.documento = '10000004';
 
 -- ═══════════════════════════════════════════════════════════
--- VERIFICACIÓN — correr estas por separado después de sembrar
--- ═══════════════════════════════════════════════════════════
-
--- Todo Luis, todos sus períodos:
--- select per.nombre, n.valor, n.en_revision
--- from notas n
--- join estudiantes e on e.id = n.estudiante_id
--- join usuarios u on u.id = e.usuario_id
--- join asignaciones a on a.id = n.asignacion_id
--- join periodos_academicos per on per.id = a.periodo_id
--- where u.documento = '10000004' order by per.numero;
-
--- La grilla de Marta para 2026-3 (activo):
--- select u.nombres, u.apellidos, n.valor
--- from matriculas m
--- join estudiantes e on e.id = m.estudiante_id
--- join usuarios u on u.id = e.usuario_id
--- join periodos_academicos per on per.id = m.periodo_id and per.nombre = '2026-3'
--- left join asignaciones asg on asg.periodo_id = per.id
---   and asg.profesor_id = (select p.id from profesores p
---     join usuarios up on up.id = p.usuario_id where up.documento = '10000002')
--- left join notas n on n.asignacion_id = asg.id and n.estudiante_id = e.id
--- order by u.apellidos;
+-- VERIFICACIÓN
+--
+-- Confirmar contraseñas:
+-- select documento, email,
+--        crypt('Prueba123!', password_hash) = password_hash as clave_ok
+-- from usuarios;
+-- -> 'true' en las 9 filas.
+--
+-- Confirmar los tres grados con sus asignaciones:
+-- select s.nombre as sede, a.grado, asig.nombre as asignatura,
+--        u.nombres as profesor
+-- from asignaciones a
+-- join sedes s on s.id = a.sede_id
+-- join asignaturas asig on asig.id = a.asignatura_id
+-- join profesores p on p.id = a.profesor_id
+-- join usuarios u on u.id = p.usuario_id
+-- join periodos_academicos per on per.id = a.periodo_id and per.nombre = '2026-3'
+-- order by a.grado;
+-- -> debe mostrar 4 filas: 9-B/MAT/Marta, 8-A/MAT/Marta,
+--    9-B/ESP/Carlos, 10-A/ESP/Carlos.
+--
+-- Confirmar que la excepción de plazo quedó SOLO en 9-B:
+-- select a.grado from excepciones_plazo ex
+-- join asignaciones a on a.id = ex.asignacion_id;
+-- -> debe devolver una sola fila: '9-B'.
+--
+-- El rol admin (Yolanda) quedó creado:
+-- select documento, email, r.nombre as rol
+-- from usuarios u join roles r on r.id = u.rol_id
+-- where documento = '10000007';
 -- ═══════════════════════════════════════════════════════════

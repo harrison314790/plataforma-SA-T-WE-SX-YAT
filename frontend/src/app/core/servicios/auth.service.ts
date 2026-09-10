@@ -3,7 +3,17 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
-export type Rol = 'admin' | 'profesor' | 'estudiante';
+/**
+ * `super_admin` es superconjunto de `admin` (el operador del producto,
+ * pensado para cuando esto se venda a otros colegios); `admin` es para
+ * secretarias/rectores/coordinadores de una sede -- ver
+ * .claude/skills/sistema-academico/references/permisos.md. Angular nunca
+ * bifurca lógica por este string (ni un switch, ni un guard que compare
+ * `rol === 'admin'`): todo pasa por el mapa `permisos` dinámico que ya
+ * cachea este service. Este tipo solo existe para lo que sí necesita
+ * mostrar el rol tal cual (encabezados, "conectado como...").
+ */
+export type Rol = 'super_admin' | 'admin' | 'profesor' | 'estudiante';
 
 interface RespuestaLogin {
   jwt: string;
