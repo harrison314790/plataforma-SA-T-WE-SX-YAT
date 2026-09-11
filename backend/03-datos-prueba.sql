@@ -42,11 +42,19 @@ select 'Escuela Guaitalá', 'vereda', 'Guaitalá', id from sedes where nombre = 
 -- 3. USUARIOS — incluye el admin operativo que faltaba (Yolanda)
 -- y dos estudiantes nuevos en grados distintos a 9-B.
 -- ─────────────────────────────────────────────
+-- El hash de abajo es 'Prueba123!' generado con el Hash::make() de
+-- Laravel (bcrypt, prefijo $2y$), no con crypt()/gen_salt('bf') de
+-- Postgres (prefijo $2a$). Se probó en carne propia: Hash::check()
+-- de Laravel rechaza los hashes $2a$ de pgcrypto con el error
+-- "This password does not use the Bcrypt algorithm" -- password_get_info()
+-- de PHP no los reconoce como bcrypt aunque sean el mismo algoritmo.
+-- Como el login lo valida Laravel (nunca SQL crudo), el hash tiene
+-- que nacer con Hash::make(), no con crypt().
 insert into usuarios (rol_id, sede_id, nombres, apellidos, documento, email, password_hash)
 select (select id from roles where nombre = datos.rol),
        (select id from sedes where nombre = datos.sede),
        datos.nombres, datos.apellidos, datos.documento, datos.email,
-       crypt('Prueba123!', gen_salt('bf'))
+       '$2y$12$UllOR/GlGRT9MaFtTC7m2O8c2TsRFirjOGNJOdHShdQalyouEYF0W'
 from (values
   ('super_admin','Sede Principal',    'Harrison', 'Medina',   '10000001', 'admin@sedeprincipal.edu.co'),
   ('admin',      'Sede Principal',    'Yolanda',  'Guasaquillo','10000007', 'secretaria@sedeprincipal.edu.co'),
@@ -243,11 +251,13 @@ where u.documento = '10000004';
 -- ═══════════════════════════════════════════════════════════
 -- VERIFICACIÓN
 --
--- Confirmar contraseñas:
--- select documento, email,
---        crypt('Prueba123!', password_hash) = password_hash as clave_ok
+-- Confirmar contraseñas (el hash es fijo, generado una vez con
+-- Hash::make('Prueba123!') en Laravel -- ver nota en el insert de
+-- usuarios más arriba sobre por qué no se genera con crypt() acá):
+-- select documento, email, password_hash like '$2y$%' as es_hash_laravel
 -- from usuarios;
--- -> 'true' en las 9 filas.
+-- -> 'true' en las 9 filas. La verificación real de que la clave es
+--    'Prueba123!' se hace en Laravel con Hash::check(), no en SQL.
 --
 -- Confirmar los tres grados con sus asignaciones:
 -- select s.nombre as sede, a.grado, asig.nombre as asignatura,

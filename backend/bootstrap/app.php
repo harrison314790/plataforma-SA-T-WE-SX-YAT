@@ -28,13 +28,40 @@ return Application::configure(basePath: dirname(__DIR__))
             'requiere.superadmin' => RequiereSuperAdmin::class,
         ]);
 
-        // 'auth.rls': auth:sanctum resuelve $request->user(),
-        // EstablecerUsuarioActual arma el contexto RLS con ese usuario.
-        // Ver .claude/skills/sistema-academico/references/laravel-postgres.md
+        // 'auth.rls': EstablecerUsuarioActual va PRIMERO -- lee el token
+        // crudo y arma el contexto RLS antes de que auth:sanctum intente
+        // resolver $request->user(), porque esa resolución lee la fila de
+        // `usuarios`, que tiene RLS. Ver el docblock de
+        // EstablecerUsuarioActual y
+        // .claude/skills/sistema-academico/references/laravel-postgres.md
         $middleware->appendToGroup('auth.rls', [
-            'auth:sanctum',
             EstablecerUsuarioActual::class,
+            'auth:sanctum',
         ]);
+
+        // El orden dentro del array de arriba NO alcanza: Laravel tiene
+        // una lista de prioridad interna que reordena middleware conocido
+        // del framework (como `Authenticate`) SIEMPRE antes que cualquier
+        // middleware propio ausente de esa lista, sin importar cómo se
+        // declare en la ruta o el grupo. Sin esta línea, `auth:sanctum`
+        // terminaba corriendo primero de todos modos -- se detectó
+        // probando de verdad contra Postgres (401 "No autenticado" en
+        // todo request autenticado, incluso con `EstablecerUsuarioActual`
+        // listado antes). Ver
+        // https://laravel.com/docs/12.x/middleware#sorting-middleware
+        //
+        // OJO con el target: la lista de prioridad de Laravel NO contiene
+        // la clase concreta `Illuminate\Auth\Middleware\Authenticate`,
+        // sino el contrato `AuthenticatesRequests` que implementa. Apuntar
+        // a la clase concreta falla en silencio (no está en el array, así
+        // que `addToMiddlewarePriorityBefore` no encuentra nada antes de
+        // qué insertar y termina agregando al final) -- también se
+        // detectó recién, inspeccionando
+        // `app('router')` con reflexión.
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: EstablecerUsuarioActual::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Formato de error uniforme para toda la API -- ver

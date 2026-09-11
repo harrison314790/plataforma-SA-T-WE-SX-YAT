@@ -254,11 +254,11 @@ begin
   end if;
 end $$;
 
--- ⚠️  CAMBIÁ 'cambia_esto_por_algo_seguro' antes de correr esto.
+-- ⚠️  CAMBIÁ 'AppUserLocalDev2026' antes de correr esto.
 do $$
 begin
   if not exists (select 1 from pg_roles where rolname = 'app_user') then
-    create role app_user login password 'cambia_esto_por_algo_seguro';
+    create role app_user login password 'AppUserLocalDev2026';
   end if;
 end $$;
 

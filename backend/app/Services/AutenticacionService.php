@@ -30,7 +30,10 @@ class AutenticacionService
             // establecer el contexto RLS para el resto de este método,
             // igual que hace el middleware EstablecerUsuarioActual en
             // cualquier otro request ya autenticado.
-            DB::statement('SET LOCAL app.usuario_id = ?', [$fila->id]);
+            // set_config() es una función normal (acepta bind params);
+            // `SET LOCAL app.usuario_id = ?` no es válido en Postgres --
+            // el comando SET solo admite literales, no parámetros.
+            DB::statement("select set_config('app.usuario_id', ?, true)", [$fila->id]);
 
             $usuario = Usuario::with('rol')->findOrFail($fila->id);
             $token = $usuario->createToken('sesion-web')->plainTextToken;
