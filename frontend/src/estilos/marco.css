@@ -1,0 +1,984 @@
+/*
+  Estilos del marco de la aplicación: barra lateral, barra superior, menú de
+  usuario, escritorio y páginas de estado.
+
+  Archivo aparte de `styles.css` (que se queda con los tokens, el reset y los
+  componentes de estado compartidos) porque ese ya pasaba las 600 líneas y
+  mezclar los tokens con el layout hacía difícil encontrar cualquiera de los
+  dos. Se cargan en orden desde `angular.json` -- los tokens primero, siempre.
+
+  Todo color, tamaño y espaciado sale de las variables de `styles.css`, cuya
+  fuente de verdad es
+  .claude/skills/sistema-academico/references/diseno-ui.md. Ningún hex ni
+  padding suelto acá.
+*/
+
+/* ═══════════════════════════════════════════════════════════
+   MARCO (layout/shell)
+
+   Grid de dos columnas: navegación fija a la izquierda, contenido a la
+   derecha. El ancho de la primera columna sale de --barra-ancho, así que
+   contraer la barra es cambiar una variable y no reescribir el layout.
+   ═══════════════════════════════════════════════════════════ */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--barra-ancho) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--superficie);
+}
+
+.shell--barra-colapsada {
+  --barra-ancho: var(--barra-ancho-colapsada);
+}
+
+.shell__barra {
+  /* La navegación no se desplaza con el contenido: en una tabla de 40
+     estudiantes, perder el menú al bajar obliga a volver arriba para cambiar
+     de módulo. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  min-width: 0;
+}
+
+.shell__cuerpo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.shell__contenido {
+  flex: 1;
+  min-width: 0;
+}
+
+.shell__velo {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BARRA LATERAL (layout/barra-lateral)
+
+   Es, junto con la barra superior, el único lugar del sistema donde se usa el
+   morado de marca. En las tablas de notas está prohibido: ahí el color
+   significa estado de calificación, y un morado institucional compitiendo con
+   verde/amarillo/rojo rompería esa señal.
+   ═══════════════════════════════════════════════════════════ */
+
+.barra {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--marca-900);
+  color: var(--marca-100);
+}
+
+.barra__marca {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+  padding: var(--espacio-4);
+  /* Hairline más claro en vez de una sombra: en Android de gama baja una
+     sombra difusa sobre un elemento que nunca se mueve es coste puro. */
+  border-bottom: 1px solid var(--marca-700);
+}
+
+.barra__escudo {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+.barra__nombre {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.barra__nombre-institucion {
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--superficie);
+  white-space: nowrap;
+}
+
+.barra__nombre-sistema {
+  font-size: 11px;
+  color: var(--marca-100);
+  white-space: nowrap;
+}
+
+.barra__grupos {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--espacio-4) 0;
+}
+
+.barra__vacia {
+  margin: 0;
+  padding: 0 var(--espacio-4);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--marca-100);
+}
+
+/* --- Grupo de módulos --------------------------------------------------- */
+
+.grupo + .grupo {
+  margin-top: var(--espacio-6);
+}
+
+/*
+  Versalitas condensadas con tracking amplio: la voz de un documento
+  institucional, no de una aplicación de consumo. La fuente condensada ya
+  estaba en los tokens para los encabezados de tabla; usarla también acá hace
+  que las dos estructuras de navegación del sistema se lean igual.
+*/
+.grupo__titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  margin: 0 0 var(--espacio-2);
+  padding: 0 var(--espacio-4);
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--marca-100);
+}
+
+.grupo__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* --- Ítem de navegación -------------------------------------------------
+   Esquinas RECTAS y una barra de hilo a la izquierda, no una píldora
+   redondeada con fondo suave: eso último es el gesto por defecto de cualquier
+   plantilla y no dice nada de este sistema. Acá el estado activo se lee como un
+   hilo tensado sobre el borde, coherente con el motivo del chumbe.
+   ----------------------------------------------------------------------- */
+
+.enlace {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+  padding: var(--espacio-2) var(--espacio-4);
+  min-height: 36px;
+  font-size: 13.5px;
+  color: var(--marca-100);
+  text-decoration: none;
+  border-radius: 0;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.enlace__hilo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+}
+
+.enlace__icono {
+  flex: none;
+}
+
+.enlace__texto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Selector con elemento (`a.enlace`) a propósito: el módulo pendiente usa la
+   misma clase sobre un <span> y NO debe tomar el hover ni el activo. */
+a.enlace:hover {
+  background: var(--marca-700);
+  color: var(--superficie);
+}
+
+a.enlace--activo {
+  background: var(--marca-700);
+  color: var(--superficie);
+  font-weight: 500;
+}
+
+/* Turquesa: es el único acento de interacción del sistema, y marcar "acá
+   estás" es exactamente eso. Va como relleno de 3px, nunca como color de
+   texto -- --accion-300 no alcanza contraste AA para texto. */
+a.enlace--activo .enlace__hilo {
+  background: var(--accion-300);
+}
+
+/* --- Módulo con permiso pero sin pantalla todavía -----------------------
+   El texto mantiene el mismo --marca-100 de los navegables (~7:1 sobre
+   --marca-900, AA de sobra). Lo que baja de intensidad es el ícono y el hilo,
+   que son decorativos y por lo tanto no tienen mínimo de contraste. Atenuar el
+   texto habría sido lo intuitivo y habría roto la legibilidad justo para quien
+   más la necesita.
+   ----------------------------------------------------------------------- */
+
+.enlace--pendiente {
+  cursor: default;
+}
+
+.enlace--pendiente .enlace__icono {
+  color: var(--marca-300);
+}
+
+.enlace__pronto {
+  margin-left: auto;
+  padding: 1px var(--espacio-2);
+  border-radius: var(--radius);
+  background: var(--marca-700);
+  color: var(--marca-100);
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+/* --- Pie: sede y botón de contraer -------------------------------------- */
+
+.barra__pie {
+  border-top: 1px solid var(--marca-700);
+  padding: var(--espacio-3) var(--espacio-4);
+}
+
+.sede {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  margin-bottom: var(--espacio-2);
+  min-width: 0;
+}
+
+/* La estrella del escudo es lo único amarillo de la barra, y es funcional:
+   llena = sede principal, contorno = escuela satélite. */
+.sede__estrella {
+  color: var(--pendiente-relleno);
+}
+
+.sede__texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sede__nombre {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--superficie);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sede__tipo {
+  font-size: 11px;
+  color: var(--marca-100);
+  white-space: nowrap;
+}
+
+.barra__alternar {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  width: 100%;
+  padding: var(--espacio-2);
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--marca-100);
+  font-family: var(--fuente-ui);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.barra__alternar:hover {
+  background: var(--marca-700);
+  color: var(--superficie);
+}
+
+/* --- Estado contraído ---------------------------------------------------
+   Solo los íconos. El texto se oculta pero el elemento sigue en el DOM con su
+   `title`, así el tooltip y el lector de pantalla siguen diciendo de qué
+   módulo se trata.
+   ----------------------------------------------------------------------- */
+
+.barra--colapsada .barra__nombre,
+.barra--colapsada .grupo__etiqueta,
+.barra--colapsada .enlace__texto,
+.barra--colapsada .enlace__pronto,
+.barra--colapsada .sede__texto,
+.barra--colapsada .barra__alternar-texto,
+.barra--colapsada .barra__vacia {
+  display: none;
+}
+
+.barra--colapsada .barra__marca,
+.barra--colapsada .enlace,
+.barra--colapsada .grupo__titulo,
+.barra--colapsada .sede,
+.barra--colapsada .barra__alternar {
+  justify-content: center;
+  padding-inline: var(--espacio-2);
+}
+
+/* Contraída, el rótulo del grupo desaparece y solo queda el tramo de hilos:
+   sigue separando las familias de módulos sin ocupar ancho. */
+.barra--colapsada .grupo__titulo {
+  height: 11px;
+  margin-bottom: var(--espacio-3);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BARRA SUPERIOR (layout/barra-superior)
+
+   Fondo --marca-050 y no blanco: la ata a la navegación morada sin sumar otro
+   bloque de color saturado. El texto principal sobre ese tono conserva ~15:1,
+   prácticamente igual que sobre blanco.
+   ═══════════════════════════════════════════════════════════ */
+
+.superior {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-4);
+  min-height: var(--superior-alto);
+  padding: 0 var(--espacio-4);
+  background: var(--marca-050);
+  border-bottom: 1px solid var(--marca-100);
+}
+
+.superior__menu-movil {
+  display: none;
+}
+
+.superior__usuario {
+  /* Empuja la identidad al extremo derecho, sin un spacer vacío en el HTML. */
+  margin-left: auto;
+  position: relative;
+}
+
+/* --- La regla de período -----------------------------------------------
+   El elemento que da identidad a esta barra. Cuatro segmentos = los cuatro
+   períodos del año; el activo marcado y los cursados atenuados. Está acá
+   porque el plazo es lo que gobierna el trabajo real del sistema: pasado el
+   cierre, RLS deja de aceptar notas y la única salida es hablar con la
+   coordinación. Verlo al entrar, y no al intentar guardar, es el punto.
+   ----------------------------------------------------------------------- */
+
+.periodo {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  min-width: 0;
+}
+
+.periodo__rotulo {
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--texto-secundario);
+}
+
+.periodo__regla {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.periodo__segmento {
+  width: 18px;
+  height: 5px;
+  /* Los cuatro períodos son una secuencia fija, no una barra de progreso
+     continua: segmentos separados con esquinas rectas lo dicen mejor que una
+     barra rellenándose. */
+  border-radius: 0;
+  background: var(--marca-100);
+}
+
+.periodo__segmento--cursado {
+  background: var(--marca-300);
+}
+
+.periodo__segmento--actual {
+  background: var(--marca-900);
+}
+
+/* Mono con cifras tabulares: '2026-3' es un dato, no prosa. Mismo criterio que
+   la columna de notas. */
+.periodo__codigo {
+  font-family: var(--fuente-datos);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--texto-principal);
+}
+
+/*
+  El plazo dentro de lo normal NO lleva color: "todo bien" no necesita una
+  alarma, y gastar verde acá pisaría el verde que en este sistema significa
+  "nota aprobada". Solo los dos estados que exigen actuar toman color, y los
+  dos llevan ícono y texto además del tono -- nunca color solo (regla dura de
+  diseno-ui.md: hay profesores con daltonismo).
+*/
+.periodo__plazo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espacio-1);
+  padding: 2px var(--espacio-2);
+  border-radius: var(--radius);
+  background: var(--fondo-solo-lectura);
+  color: var(--texto-secundario);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.periodo__plazo[data-tono='por-vencer'] {
+  background: var(--pendiente-100);
+  color: var(--pendiente-texto);
+}
+
+.periodo__plazo[data-tono='vencido'] {
+  background: var(--reprobado-050);
+  color: var(--reprobado-900);
+}
+
+.periodo--sin-activo {
+  padding: 2px var(--espacio-2);
+  border-radius: var(--radius);
+  background: var(--pendiente-100);
+  color: var(--pendiente-texto);
+  font-size: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MENÚ DE USUARIO (layout/menu-usuario)
+   ═══════════════════════════════════════════════════════════ */
+
+.usuario {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  max-width: 220px;
+  padding: var(--espacio-1) var(--espacio-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  font-family: var(--fuente-ui);
+  cursor: pointer;
+}
+
+.usuario:hover {
+  border-color: var(--marca-100);
+  background: var(--superficie);
+}
+
+/* Iniciales y no una foto: no hay módulo de fotos, y un marcador genérico no
+   dice nada que las iniciales no digan mejor. Morado porque es identidad. */
+.usuario__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--marca-700);
+  color: var(--superficie);
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.usuario__identidad {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.usuario__nombre {
+  max-width: 140px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--texto-principal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usuario__rol {
+  font-size: 11px;
+  color: var(--texto-secundario);
+  white-space: nowrap;
+}
+
+.usuario__chevron {
+  color: var(--texto-secundario);
+}
+
+.usuario-panel {
+  position: absolute;
+  top: calc(100% + var(--espacio-2));
+  right: 0;
+  z-index: 30;
+  width: 248px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+  box-shadow: var(--sombra-2);
+}
+
+.usuario-panel__cabecera {
+  padding: var(--espacio-3);
+  border-bottom: 1px solid var(--borde);
+}
+
+.usuario-panel__nombre {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.usuario-panel__correo {
+  margin: var(--espacio-1) 0 0;
+  font-size: 12px;
+  color: var(--texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+.usuario-panel__datos {
+  display: grid;
+  gap: var(--espacio-2);
+  margin: 0;
+  padding: var(--espacio-3);
+  border-bottom: 1px solid var(--borde);
+}
+
+.usuario-panel__datos > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--espacio-3);
+}
+
+.usuario-panel__datos dt {
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--texto-secundario);
+}
+
+.usuario-panel__datos dd {
+  margin: 0;
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.usuario-panel__dato-numerico {
+  font-family: var(--fuente-datos);
+  font-variant-numeric: tabular-nums;
+}
+
+.usuario-panel__salir {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  width: 100%;
+  padding: var(--espacio-3);
+  border: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: transparent;
+  color: var(--texto-principal);
+  font-family: var(--fuente-ui);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.usuario-panel__salir:hover:not(:disabled) {
+  background: var(--reprobado-050);
+  color: var(--reprobado-900);
+}
+
+.usuario-panel__salir:disabled {
+  color: var(--texto-secundario);
+  cursor: progress;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AVISO DE SIN CONEXIÓN (quinto estado obligatorio)
+
+   Persistente y NO bloqueante: el profesor tiene que poder seguir digitando
+   con la señal caída. Un modal acá le costaría una hora de trabajo.
+   ═══════════════════════════════════════════════════════════ */
+
+.aviso-sin-conexion {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  margin: 0;
+  padding: var(--espacio-2) var(--espacio-4);
+  background: var(--pendiente-100);
+  color: var(--pendiente-texto);
+  border-bottom: 1px solid var(--pendiente-relleno);
+  font-size: 12.5px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ESCRITORIO (features/inicio)
+   ═══════════════════════════════════════════════════════════ */
+
+.escritorio {
+  max-width: 1120px;
+  padding: var(--espacio-8) var(--espacio-6);
+}
+
+.escritorio__cabecera {
+  margin-bottom: var(--espacio-8);
+}
+
+.escritorio__contexto {
+  margin: 0 0 var(--espacio-2);
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--marca-700);
+}
+
+.escritorio__titulo {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--texto-principal);
+}
+
+.escritorio__resumen {
+  max-width: 56ch;
+  margin: var(--espacio-3) 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--texto-secundario);
+}
+
+.escritorio__resumen strong {
+  color: var(--texto-principal);
+  font-weight: 600;
+}
+
+/* --- Fichas de módulo --------------------------------------------------
+   Borde de 1px, sin sombra y sin hover-lift: esto es un ERP, no una página de
+   producto. Lo único que cambia al pasar el puntero es el borde, que toma el
+   turquesa de interacción.
+   ----------------------------------------------------------------------- */
+
+.fichas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: var(--espacio-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ficha {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+  height: 100%;
+  padding: var(--espacio-4);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+  background: var(--superficie);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 120ms ease;
+}
+
+a.ficha:hover {
+  border-color: var(--accion-700);
+}
+
+a.ficha:hover .ficha__entrar {
+  color: var(--accion-900);
+}
+
+/* El tramo de hilos de la barra lateral, anclado arriba de la ficha: la misma
+   firma en las dos superficies del sistema. */
+.hilos--ficha {
+  height: 14px;
+  margin-bottom: var(--espacio-2);
+}
+
+.ficha__icono {
+  color: var(--marca-700);
+}
+
+.ficha__titulo {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ficha__grupo {
+  margin: 0;
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--texto-secundario);
+}
+
+.ficha__vistas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-1);
+  list-style: none;
+  margin: var(--espacio-2) 0 0;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--texto-secundario);
+}
+
+.ficha__vistas li::before {
+  content: '·';
+  margin-right: var(--espacio-2);
+  color: var(--marca-300);
+}
+
+.ficha__entrar {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-1);
+  margin-top: auto;
+  padding-top: var(--espacio-3);
+  color: var(--accion-700);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* El mismo chevron del menú de usuario, girado: acá señala "hacia adelante",
+   no "hacia abajo". Girarlo evita un decimosexto trazo en el set para decir lo
+   mismo en otra dirección. */
+.ficha__entrar app-icono {
+  transform: rotate(-90deg);
+}
+
+/* --- Fichas que no se pueden abrir -------------------------------------- */
+
+.ficha--inactiva {
+  background: var(--fondo-solo-lectura);
+  border-style: dashed;
+  color: var(--texto-secundario);
+}
+
+.ficha--inactiva .ficha__icono,
+.ficha--inactiva .ficha__titulo {
+  color: var(--texto-secundario);
+}
+
+.ficha--inactiva .hilos__hilo {
+  background: var(--borde);
+}
+
+/* El motivo, siempre explícito: "en construcción" y "no habilitado para tu
+   rol" son dos situaciones con salidas distintas -- una se resuelve pidiendo
+   permiso, la otra esperando. Un "No disponible" para las dos no sirve. */
+.ficha__motivo {
+  margin: auto 0 0;
+  padding-top: var(--espacio-3);
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--texto-secundario);
+}
+
+.fichas__vacio {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-3);
+  padding: var(--espacio-8);
+  border: 1px dashed var(--borde);
+  border-radius: var(--radius);
+  color: var(--texto-secundario);
+}
+
+.fichas__vacio p {
+  max-width: 48ch;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.fichas__vacio app-icono {
+  color: var(--marca-300);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PÁGINAS DE ESTADO (sin permiso, no encontrado, en construcción)
+   ═══════════════════════════════════════════════════════════ */
+
+.estado-pagina,
+.en-construccion {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-3);
+  max-width: 52ch;
+  padding: var(--espacio-12) var(--espacio-6);
+  color: var(--texto-secundario);
+}
+
+.estado-pagina app-icono,
+.en-construccion app-icono {
+  color: var(--marca-300);
+}
+
+.estado-pagina h1,
+.en-construccion h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--texto-principal);
+}
+
+.estado-pagina p,
+.en-construccion p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.estado-pagina strong,
+.en-construccion strong {
+  color: var(--texto-principal);
+  font-weight: 600;
+}
+
+.estado-pagina__accion,
+.en-construccion__volver {
+  margin-top: var(--espacio-2);
+  padding: var(--espacio-2) var(--espacio-4);
+  border-radius: var(--radius);
+  background: var(--accion-700);
+  color: var(--superficie);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.estado-pagina__accion:hover,
+.en-construccion__volver:hover {
+  background: var(--accion-900);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MÓVIL Y TÁCTIL
+
+   La barra lateral pasa de columna del grid a panel deslizante. El umbral son
+   900px: por debajo, el contenido de un ERP denso ya no cabe al lado de 248px
+   de navegación.
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shell__barra {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 40;
+    width: var(--barra-ancho);
+    /* Fuera de pantalla por defecto. `transform` y no `left`: se compone en la
+       GPU y no fuerza un reflow por fotograma, que en Android de gama baja es
+       la diferencia entre deslizar y saltar. */
+    transform: translateX(-100%);
+    transition: transform 160ms ease;
+  }
+
+  .shell--barra-abierta .shell__barra {
+    transform: translateX(0);
+  }
+
+  .shell__velo {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(26, 26, 26, 0.45);
+  }
+
+  .superior__menu-movil {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* 40px de caja más el padding de la barra: queda por encima del mínimo de
+       44px de área táctil recomendado. Por debajo de eso, el dedo toca el
+       borde -- el mismo criterio que prohíbe la densidad compacta en móvil. */
+    width: 40px;
+    height: 40px;
+    flex: none;
+    border: 1px solid var(--marca-100);
+    border-radius: var(--radius);
+    background: var(--superficie);
+    color: var(--marca-900);
+    cursor: pointer;
+  }
+
+  /* Contraída no tiene sentido en móvil: el panel ya se esconde entero, y a
+     64px de ancho el toque en un ítem cae sobre el de al lado. */
+  .shell--barra-colapsada {
+    --barra-ancho: 248px;
+  }
+
+  .barra__alternar {
+    display: none;
+  }
+
+  /* En móvil los ítems se separan más: 36px de alto es cómodo con puntero pero
+     queda corto para el dedo. */
+  .enlace {
+    min-height: 44px;
+  }
+
+  .escritorio {
+    padding: var(--espacio-6) var(--espacio-4);
+  }
+
+  /* Se sacrifica lo explicativo y se conserva el dato: el código del período y
+     el plazo siguen visibles, el rótulo y la regla de cuatro segmentos no. */
+  .usuario__identidad,
+  .periodo__rotulo,
+  .periodo__regla {
+    display: none;
+  }
+}

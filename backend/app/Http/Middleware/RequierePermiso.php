@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Permiso;
+use App\Services\PermisoService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,28 +16,27 @@ use Symfony\Component\HttpFoundation\Response;
  * (aunque `permisos_lectura` es de lectura abierta, mejor no asumir el
  * orden al revés).
  *
+ * La decisión de si el rol puede o no está delegada en PermisoService y no
+ * escrita acá: el bypass de `super_admin` es una regla que también
+ * necesitan el mapa de permisos del login y el armado del menú, y las tres
+ * tienen que coincidir exactamente con lo que hace RLS. Ver el docblock de
+ * PermisoService para el bug que causó tenerla duplicada.
+ *
  * Uso: ->middleware('requiere.permiso:btn_registrar_nota')
  *
  * Ver .claude/skills/sistema-academico/references/permisos.md
  */
 class RequierePermiso
 {
+    public function __construct(private readonly PermisoService $permisoService)
+    {
+    }
+
     public function handle(Request $request, Closure $next, string $codigo): Response
     {
         $rol = $request->user()->rol->nombre;
 
-        // super_admin pasa cualquier `codigo` sin consultar la tabla --
-        // mismo criterio que el bypass total que ya tiene en RLS
-        // (fn_es_super_admin()). Ver permisos.md para el porqué.
-        if ($rol === 'super_admin') {
-            return $next($request);
-        }
-
-        $habilitado = Permiso::whereHas('recurso', fn ($q) => $q->where('codigo', $codigo))
-            ->whereHas('rol', fn ($q) => $q->where('nombre', $rol))
-            ->value('habilitado');
-
-        if (! $habilitado) {
+        if (! $this->permisoService->puede($rol, $codigo)) {
             return response()->json([
                 'error' => [
                     'codigo' => 'NO_AUTORIZADO',

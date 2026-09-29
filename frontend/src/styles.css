@@ -76,6 +76,13 @@
   --fila-compacta: 32px;
   --fila-media: 40px;
   --fila-comoda: 56px;
+
+  /* Marco de la aplicación. La barra lateral cambia de ancho al contraerse
+     (ver .shell--barra-colapsada); el resto se acomoda solo porque el grid
+     lee esta variable en vez de tener el ancho escrito dos veces. */
+  --barra-ancho: 248px;
+  --barra-ancho-colapsada: 64px;
+  --superior-alto: 56px;
 }
 
 * {
@@ -107,6 +114,84 @@ body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ÍCONOS (shared/componentes/icono)
+   ═══════════════════════════════════════════════════════════ */
+
+.icono {
+  display: block;
+  flex: none;
+  /* Hereda el color del texto que acompaña: un ícono nunca tiene color propio
+     en este sistema, así se mantiene coherente en cualquier contexto. */
+  color: inherit;
+}
+
+/* Única excepción con relleno, y es funcional: estrella llena = sede
+   principal, contorno = escuela satélite (ver diseno-ui.md). */
+.icono--relleno path {
+  fill: currentColor;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EL MOTIVO DEL SISTEMA: TRAMO DE HILOS
+
+   Cuatro franjas verticales de grosor distinto. No es una textura genérica:
+   es una cita al chumbe, la faja tejida nasa, que es literalmente franjas de
+   anchos desiguales. Aparece en dos lugares —los rótulos de grupo de la barra
+   lateral y el borde de las fichas del escritorio— y en ningún otro, para que
+   funcione como firma del sistema y no como relleno decorativo.
+
+   Es puramente visual, de ahí el aria-hidden en las plantillas: lo que informa
+   es el rótulo que acompaña.
+   ═══════════════════════════════════════════════════════════ */
+
+.hilos {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 11px;
+  flex: none;
+}
+
+.hilos__hilo {
+  display: block;
+  height: 100%;
+  background: var(--marca-300);
+}
+
+.hilos__hilo--fino { width: 1px; }
+.hilos__hilo--medio { width: 2px; }
+.hilos__hilo--grueso { width: 3px; }
+
+/* El segundo hilo del tramo va más claro: sin ese contraste interno las cuatro
+   franjas se leen como un solo bloque y el motivo se pierde. */
+.hilos__hilo--grueso { background: var(--marca-100); }
+
+/* ═══════════════════════════════════════════════════════════
+   ACCESIBILIDAD: SALTO AL CONTENIDO
+   ═══════════════════════════════════════════════════════════ */
+
+.salto-contenido {
+  position: absolute;
+  left: var(--espacio-2);
+  top: var(--espacio-2);
+  z-index: 100;
+  padding: var(--espacio-2) var(--espacio-3);
+  border-radius: var(--radius);
+  background: var(--accion-900);
+  color: var(--superficie);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  /* Fuera de pantalla hasta que reciba foco -- nunca `display: none`, que lo
+     sacaría del orden de tabulación y lo volvería inútil. */
+  transform: translateY(-200%);
+}
+
+.salto-contenido:focus-visible {
+  transform: translateY(0);
 }
 
 /* Componentes de estado compartidos (shared/componentes/*) -- ver references/diseno-ui.md */

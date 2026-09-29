@@ -1,3 +1,15 @@
-<div class="sin-permiso" role="alert">
-  <p>No tienes permiso para ver esta sección.</p>
-</div>
+<section class="estado-pagina" role="alert">
+  <app-icono nombre="llave" [tamano]="32" />
+  <h1>No tienes acceso a esta sección</h1>
+
+  <p>
+    @if (usuario(); as u) {
+      Tu rol de <strong>{{ u.rol.etiqueta }}</strong> no incluye esta parte del
+      sistema. Si necesitas entrar, pídeselo a la coordinación indicando ese rol.
+    } @else {
+      Esta sección no está incluida en tu rol.
+    }
+  </p>
+
+  <a class="estado-pagina__accion" routerLink="/inicio">Volver al inicio</a>
+</section>

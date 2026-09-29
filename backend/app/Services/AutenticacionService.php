@@ -3,24 +3,36 @@
 namespace App\Services;
 
 use App\Exceptions\ErrorDeNegocio;
-use App\Models\Permiso;
+use App\Models\PeriodoAcademico;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Login es un caso especial: corre ANTES de que exista sesión de
- * Sanctum, así que el middleware `auth.rls` (que necesita
- * `$request->user()` ya resuelto) todavía no puede aplicarse. Esta clase
- * hace su propia versión puntual de "establecer quién es el usuario"
- * -- ver [[laravel-postgres]] para el porqué de `fn_usuario_para_login`.
+ * Login es un caso especial: corre ANTES de que exista sesión de Sanctum,
+ * así que el middleware `auth.rls` (que necesita `$request->user()` ya
+ * resuelto) todavía no puede aplicarse. Esta clase hace su propia versión
+ * puntual de "establecer quién es el usuario" -- ver
+ * references/laravel-postgres.md para el porqué de `fn_usuario_para_login`.
  */
 class AutenticacionService
 {
+    public function __construct(
+        private readonly PermisoService $permisoService,
+        private readonly NavegacionService $navegacionService,
+    ) {
+    }
+
+    /**
+     * @return array{token: string, usuario: Usuario, permisos: array<string, bool>, modulos: \Illuminate\Support\Collection<int, array<string, mixed>>, periodoActivo: PeriodoAcademico|null}
+     */
     public function iniciarSesion(string $email, string $password): array
     {
         $fila = DB::selectOne('select * from fn_usuario_para_login(?)', [$email]);
 
+        // Un solo mensaje para los dos casos (email que no existe y
+        // contraseña incorrecta), a propósito: distinguirlos le confirmaría
+        // a un atacante qué correos están registrados en la institución.
         if (! $fila || ! Hash::check($password, $fila->password_hash)) {
             throw new ErrorDeNegocio('Correo o contraseña incorrectos');
         }
@@ -35,23 +47,66 @@ class AutenticacionService
             // el comando SET solo admite literales, no parámetros.
             DB::statement("select set_config('app.usuario_id', ?, true)", [$fila->id]);
 
-            $usuario = Usuario::with('rol')->findOrFail($fila->id);
-            $token = $usuario->createToken('sesion-web')->plainTextToken;
+            $usuario = Usuario::with(['rol', 'sede'])->findOrFail($fila->id);
 
             return [
-                'token' => $token,
-                'rol' => $usuario->rol->nombre,
-                'permisos' => $this->permisosPara($usuario->rol->nombre),
+                'token' => $usuario->createToken('sesion-web')->plainTextToken,
+                ...$this->datosDeSesion($usuario),
             ];
         });
     }
 
-    public function permisosPara(string $rolNombre): array
+    /**
+     * Los datos de sesión de un usuario ya autenticado, sin token: es lo
+     * que devuelve GET /autenticacion/yo cuando Angular recarga la página
+     * y necesita rehidratar la sesión que tenía guardada.
+     *
+     * Es el mismo método que usa el login, no una copia: si algún día la
+     * sesión suma un dato (digamos, las asignaciones del profesor), aparece
+     * de una vez en los dos endpoints y no se pueden desincronizar.
+     *
+     * @return array{usuario: Usuario, permisos: array<string, bool>, modulos: \Illuminate\Support\Collection<int, array<string, mixed>>, periodoActivo: PeriodoAcademico|null}
+     */
+    public function datosDeSesion(Usuario $usuario): array
     {
-        return Permiso::whereHas('rol', fn ($q) => $q->where('nombre', $rolNombre))
-            ->with('recurso')
-            ->get()
-            ->mapWithKeys(fn (Permiso $permiso) => [$permiso->recurso->codigo => $permiso->habilitado])
-            ->all();
+        $usuario->loadMissing(['rol', 'sede']);
+        $rol = $usuario->rol->nombre;
+
+        return [
+            'usuario' => $usuario,
+            'permisos' => $this->permisoService->mapaPara($rol),
+            'modulos' => $this->navegacionService->modulosPara($rol),
+            'periodoActivo' => $this->periodoActivo(),
+        ];
+    }
+
+    /**
+     * Revoca ÚNICAMENTE el token con el que vino esta petición, no todos
+     * los del usuario: los computadores de la escuela son compartidos y una
+     * misma persona puede tener sesión abierta en el aula y en la
+     * secretaría. Cerrar sesión en un equipo no debe tumbar la del otro.
+     */
+    public function cerrarSesion(Usuario $usuario): void
+    {
+        $usuario->currentAccessToken()?->delete();
+    }
+
+    /**
+     * `periodos_academicos.activo` marca el período en curso. Puede no
+     * haber ninguno (entre un año escolar y el siguiente), y eso no es un
+     * error: la barra superior sabe mostrar ese caso.
+     *
+     * Si hubiera más de uno marcado activo -- un dato inconsistente que la
+     * base hoy no impide -- se toma el más reciente en vez de fallar: dejar
+     * a todo el mundo sin poder entrar por un período mal marcado sería una
+     * reacción desproporcionada a un problema que solo afecta un rótulo.
+     */
+    private function periodoActivo(): ?PeriodoAcademico
+    {
+        return PeriodoAcademico::query()
+            ->where('activo', true)
+            ->orderByDesc('anio')
+            ->orderByDesc('numero')
+            ->first();
     }
 }

@@ -2,62 +2,66 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import type { ModuloSesion } from '../interfaces/modulo.interface';
+import type { PeriodoActivo, RespuestaLogin, Rol, Sesion, UsuarioSesion } from '../interfaces/usuario.interface';
 
-/**
- * `super_admin` es superconjunto de `admin` (el operador del producto,
- * pensado para cuando esto se venda a otros colegios); `admin` es para
- * secretarias/rectores/coordinadores de una sede -- ver
- * .claude/skills/sistema-academico/references/permisos.md. Angular nunca
- * bifurca lógica por este string (ni un switch, ni un guard que compare
- * `rol === 'admin'`): todo pasa por el mapa `permisos` dinámico que ya
- * cachea este service. Este tipo solo existe para lo que sí necesita
- * mostrar el rol tal cual (encabezados, "conectado como...").
- */
-export type Rol = 'super_admin' | 'admin' | 'profesor' | 'estudiante';
-
-interface RespuestaLogin {
-  jwt: string;
-  refreshToken: string;
-  expiraEn: string; // ISO 8601
-  rol: Rol;
-  permisos: Record<string, boolean>; // codigo -> habilitado, ver references/permisos.md
-}
+export type { Rol } from '../interfaces/usuario.interface';
 
 const CLAVE_SESION = 'sa_sesion';
-// Refrescar un minuto antes de la expiración real, no justo al filo.
-const MARGEN_REFRESCO_MS = 60_000;
+
+/** Lo que se guarda entre recargas: el token y la sesión que vino con él. */
+interface SesionPersistida extends Sesion {
+  token: string;
+}
 
 /**
- * Cachea el JWT y el mapa de permisos en memoria tras el login (una sola
- * consulta, ver references/permisos.md), y los persiste en
- * `sessionStorage` -- NUNCA `localStorage`. La razón es de contexto, no
- * técnica: muchos profesores usan computadores compartidos de la
- * escuela; con `localStorage` la sesión quedaría abierta indefinidamente
- * para el siguiente que use el equipo. `sessionStorage` se borra solo al
- * cerrar el navegador (no la pestaña), que es el comportamiento correcto
- * acá. Ver la decisión completa en
- * .claude/skills/sistema-academico/references/node-supabase.md.
+ * Dueño único de la sesión: el token de Sanctum, quién está conectado, el
+ * período activo, el mapa de permisos y los módulos. Todo llega en UNA
+ * respuesta al iniciar sesión (ver SesionResource en el backend) porque cada
+ * round-trip extra es un punto más donde la pantalla se queda a medias con
+ * conectividad intermitente.
  *
- * El JWT de Supabase expira en ~1h. Este service programa un refresco
- * automático con el refresh_token antes de esa expiración
- * (`programarRefresco`), para que la sesión no muera a mitad de una
- * clase mientras un profesor está digitando notas.
+ * DÓNDE SE GUARDA, Y POR QUÉ NO EN `localStorage`
+ * `sessionStorage`. La razón es de contexto, no técnica: muchos profesores
+ * usan los computadores compartidos de la escuela, y con `localStorage` la
+ * sesión quedaría abierta para el siguiente que se siente en el equipo.
+ * `sessionStorage` muere al cerrar el navegador, que es el comportamiento
+ * correcto acá.
  *
- * *appHasRole y los guards leen el signal de permisos -- nunca vuelven a
- * pedirle nada al backend por cada chequeo.
+ * POR QUÉ YA NO HAY REFRESH TOKEN NI TEMPORIZADOR DE REFRESCO
+ * Los tenía la versión anterior de este service, heredados del diseño con
+ * Supabase Auth (JWT de ~1h + refresh rotativo). Laravel Sanctum no funciona
+ * así: emite un token OPACO ('19|R5Uem...'), no un JWT, sin fecha de
+ * expiración adentro y hoy sin expiración configurada. No hay nada que
+ * decodificar ni cuándo refrescar, así que programar un refresco era código
+ * muerto que además rompía el login: el service leía `respuesta.jwt` y
+ * `respuesta.expiraEn`, campos que este backend nunca mandó, y terminaba con
+ * `_jwt` en `undefined` -- que no es `null`, así que `estaAutenticado()`
+ * devolvía true con una sesión sin token y todo request moría en 401.
+ *
+ * Lo que reemplaza al refresco: si el token deja de servir, el backend
+ * responde 401 y `sesionExpiradaInterceptor` cierra la sesión y manda al
+ * login. Es reactivo en vez de preventivo, y es lo que corresponde con un
+ * token sin vencimiento conocido.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
 
-  private readonly _jwt = signal<string | null>(null);
-  private readonly _refreshToken = signal<string | null>(null);
-  private readonly _rol = signal<Rol | null>(null);
-  private readonly _permisos = signal<Record<string, boolean>>({});
-  private temporizadorRefresco: ReturnType<typeof setTimeout> | null = null;
+  private readonly _token = signal<string | null>(null);
+  private readonly _sesion = signal<Sesion | null>(null);
 
-  readonly estaAutenticado = computed(() => this._jwt() !== null);
-  readonly rol = this._rol.asReadonly();
+  /**
+   * Exige las dos cosas, no solo el token: una sesión a medias (token sin
+   * usuario) pintaría la barra superior vacía en vez de mandar al login. Es
+   * justo el estado en el que quedaba la versión anterior.
+   */
+  readonly estaAutenticado = computed(() => this._token() !== null && this._sesion() !== null);
+
+  readonly usuario = computed<UsuarioSesion | null>(() => this._sesion()?.usuario ?? null);
+  readonly rol = computed<Rol | null>(() => this._sesion()?.usuario.rol.codigo ?? null);
+  readonly periodoActivo = computed<PeriodoActivo | null>(() => this._sesion()?.periodoActivo ?? null);
+  readonly modulos = computed<ModuloSesion[]>(() => this._sesion()?.modulos ?? []);
 
   constructor() {
     this.restaurarSesion();
@@ -67,82 +71,111 @@ export class AuthService {
     const respuesta = await firstValueFrom(
       this.http.post<RespuestaLogin>(`${environment.apiUrl}/autenticacion/login`, { email, password }),
     );
-    this.aplicarSesion(respuesta);
+
+    const { token, ...sesion } = respuesta;
+    this.aplicar(token, sesion);
   }
 
-  tienePermiso(codigo: string): boolean {
-    return this._permisos()[codigo] === true;
+  /**
+   * Cierra sesión también en el servidor: revoca el token en
+   * `personal_access_tokens` para que no quede válido si alguien lo copió
+   * antes. Si la petición falla (sin señal, justo el caso frecuente acá) la
+   * sesión local se limpia igual -- dejar al profesor "dentro" porque no hubo
+   * red sería lo peor de los dos mundos en un equipo compartido.
+   */
+  async cerrarSesion(): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http.post(`${environment.apiUrl}/autenticacion/cerrar-sesion`, {}),
+      );
+    } catch {
+      // Sin conexión o token ya inválido: no hay nada que rescatar.
+    } finally {
+      this.descartarSesionLocal();
+    }
   }
 
-  jwtActual(): string | null {
-    return this._jwt();
-  }
-
-  cerrarSesion(): void {
-    this.cancelarRefresco();
-    this._jwt.set(null);
-    this._refreshToken.set(null);
-    this._rol.set(null);
-    this._permisos.set({});
+  /**
+   * Limpia la sesión del navegador SIN llamar al backend. Lo usa el
+   * interceptor de 401: volver a pegarle al servidor con un token que él
+   * mismo acaba de rechazar solo agrega una petición condenada.
+   */
+  descartarSesionLocal(): void {
+    this._token.set(null);
+    this._sesion.set(null);
     sessionStorage.removeItem(CLAVE_SESION);
   }
 
-  private aplicarSesion(respuesta: RespuestaLogin): void {
-    this._jwt.set(respuesta.jwt);
-    this._refreshToken.set(respuesta.refreshToken);
-    this._rol.set(respuesta.rol);
-    this._permisos.set(respuesta.permisos);
-    sessionStorage.setItem(CLAVE_SESION, JSON.stringify(respuesta));
-    this.programarRefresco(respuesta.expiraEn);
+  tienePermiso(codigo: string): boolean {
+    return this._sesion()?.permisos[codigo] === true;
   }
 
-  /** Al recargar la página dentro de la misma pestaña/navegador, retoma la sesión sin pedir login de nuevo. */
+  tokenActual(): string | null {
+    return this._token();
+  }
+
+  /**
+   * Vuelve a pedir la sesión al backend con el token que ya se tiene.
+   *
+   * Se llama al arrancar con una sesión restaurada, y sirve para dos cosas a
+   * la vez: confirmar que el token sigue vivo, y traer permisos y módulos
+   * frescos por si `super_admin` habilitó o apagó algo mientras la pestaña
+   * estaba abierta. Sin esto, la copia de `sessionStorage` podría quedar
+   * desactualizada por horas.
+   *
+   * No propaga el error: un 401 ya lo maneja el interceptor cerrando sesión,
+   * y un fallo de red no debe tumbar una sesión que probablemente siga
+   * siendo válida -- se sigue con los datos guardados.
+   */
+  async revalidarSesion(): Promise<void> {
+    const token = this._token();
+    if (token === null) return;
+
+    try {
+      const sesion = await firstValueFrom(
+        this.http.get<Sesion>(`${environment.apiUrl}/autenticacion/yo`),
+      );
+      this.aplicar(token, sesion);
+    } catch {
+      // 401 -> lo resuelve sesionExpiradaInterceptor. Sin red -> se
+      // conserva la sesión guardada, que es lo útil offline.
+    }
+  }
+
+  private aplicar(token: string, sesion: Sesion): void {
+    this._token.set(token);
+    this._sesion.set(sesion);
+    sessionStorage.setItem(CLAVE_SESION, JSON.stringify({ token, ...sesion } satisfies SesionPersistida));
+  }
+
+  /**
+   * Retoma la sesión al recargar la página, de forma SINCRÓNICA: los guards
+   * de ruta corren antes de que cualquier petición pueda responder, así que
+   * si esto fuera asíncrono el primer `canActivate` vería "no autenticado" y
+   * rebotaría al login en cada F5. La revalidación contra el backend va
+   * aparte (`revalidarSesion`, disparada por el shell) y no bloquea el
+   * arranque.
+   */
   private restaurarSesion(): void {
     const crudo = sessionStorage.getItem(CLAVE_SESION);
-    if (!crudo) return;
+    if (crudo === null) return;
+
     try {
-      const sesion = JSON.parse(crudo) as RespuestaLogin;
-      if (new Date(sesion.expiraEn).getTime() <= Date.now()) {
+      const guardada = JSON.parse(crudo) as Partial<SesionPersistida>;
+
+      // Se valida la forma, no solo que el JSON parsee: una sesión de una
+      // versión anterior del frontend (la que guardaba `jwt`/`refreshToken`)
+      // parsea perfecto y dejaría el token en `undefined`.
+      if (typeof guardada.token !== 'string' || guardada.token === '' || guardada.usuario == null) {
         sessionStorage.removeItem(CLAVE_SESION);
         return;
       }
-      this._jwt.set(sesion.jwt);
-      this._refreshToken.set(sesion.refreshToken);
-      this._rol.set(sesion.rol);
-      this._permisos.set(sesion.permisos);
-      this.programarRefresco(sesion.expiraEn);
+
+      const { token, ...sesion } = guardada as SesionPersistida;
+      this._token.set(token);
+      this._sesion.set(sesion);
     } catch {
       sessionStorage.removeItem(CLAVE_SESION);
-    }
-  }
-
-  private programarRefresco(expiraEn: string): void {
-    this.cancelarRefresco();
-    const msHastaRefresco = new Date(expiraEn).getTime() - Date.now() - MARGEN_REFRESCO_MS;
-    this.temporizadorRefresco = setTimeout(() => void this.refrescar(), Math.max(msHastaRefresco, 0));
-  }
-
-  private cancelarRefresco(): void {
-    if (this.temporizadorRefresco !== null) {
-      clearTimeout(this.temporizadorRefresco);
-      this.temporizadorRefresco = null;
-    }
-  }
-
-  private async refrescar(): Promise<void> {
-    const refreshToken = this._refreshToken();
-    if (!refreshToken) return;
-    try {
-      const respuesta = await firstValueFrom(
-        this.http.post<RespuestaLogin>(`${environment.apiUrl}/autenticacion/refrescar`, { refreshToken }),
-      );
-      this.aplicarSesion(respuesta);
-    } catch {
-      // El refresh_token también expiró o ya se usó (Supabase lo rota en
-      // cada refresco) -- no hay forma de recuperar la sesión en
-      // silencio. Mejor cerrarla explícitamente que dejar al profesor
-      // con una sesión que parece viva pero ya no sirve para nada.
-      this.cerrarSesion();
     }
   }
 }

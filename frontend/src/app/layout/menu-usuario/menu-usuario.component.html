@@ -1,0 +1,59 @@
+<button
+  type="button"
+  class="usuario"
+  (click)="alternar()"
+  [attr.aria-expanded]="abierto()"
+  aria-haspopup="menu"
+>
+  <span class="usuario__avatar" aria-hidden="true">{{ usuario().iniciales }}</span>
+
+  <!--
+    El nombre y el rol se ocultan en pantalla angosta y queda solo el avatar:
+    el nombre completo sigue disponible para lectores de pantalla vía el
+    aria-label del botón, que se arma con los dos.
+  -->
+  <span class="usuario__identidad">
+    <span class="usuario__nombre">{{ usuario().nombreCompleto }}</span>
+    <span class="usuario__rol">{{ usuario().rol.etiqueta }}</span>
+  </span>
+
+  <app-icono class="usuario__chevron" nombre="chevron" [tamano]="16" />
+</button>
+
+@if (abierto()) {
+  <div class="usuario-panel" role="menu">
+    <div class="usuario-panel__cabecera">
+      <p class="usuario-panel__nombre">{{ usuario().nombreCompleto }}</p>
+      <p class="usuario-panel__correo">{{ usuario().email }}</p>
+    </div>
+
+    <dl class="usuario-panel__datos">
+      <div>
+        <dt>Rol</dt>
+        <dd>{{ usuario().rol.etiqueta }}</dd>
+      </div>
+      <div>
+        <dt>Documento</dt>
+        <!-- Mono: es un dato de identificación, no texto corrido. -->
+        <dd class="usuario-panel__dato-numerico">{{ usuario().documento }}</dd>
+      </div>
+      @if (usuario().sede; as sede) {
+        <div>
+          <dt>Sede</dt>
+          <dd>{{ sede.nombre }}</dd>
+        </div>
+      }
+    </dl>
+
+    <button
+      type="button"
+      class="usuario-panel__salir"
+      role="menuitem"
+      (click)="cerrarSesion()"
+      [disabled]="cerrando()"
+    >
+      <app-icono nombre="salir" [tamano]="17" />
+      <span>{{ cerrando() ? 'Cerrando sesión…' : 'Cerrar sesión' }}</span>
+    </button>
+  </div>
+}

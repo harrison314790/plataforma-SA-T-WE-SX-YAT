@@ -1,0 +1,113 @@
+<!--
+  El tramo de hilos (.hilos) es el motivo del sistema: cuatro franjas
+  verticales de grosor distinto, tomadas del chumbe tejido. Es puramente
+  decorativo, de ahí el aria-hidden -- lo que informa es el rótulo del grupo.
+-->
+<nav class="barra" [class.barra--colapsada]="colapsada()" aria-label="Módulos del sistema">
+  <div class="barra__marca">
+    <img class="barra__escudo" src="assets/imagenes/iconoSAT.png" alt="" aria-hidden="true" />
+    <span class="barra__nombre">
+      <span class="barra__nombre-institucion">SA´T WE´SX YAT</span>
+      <span class="barra__nombre-sistema">Sistema académico</span>
+    </span>
+  </div>
+
+  <div class="barra__grupos">
+    @for (grupo of grupos(); track grupo.etiqueta) {
+      <section class="grupo">
+        <h2 class="grupo__titulo">
+          <span class="hilos" aria-hidden="true">
+            <i class="hilos__hilo hilos__hilo--fino"></i>
+            <i class="hilos__hilo hilos__hilo--grueso"></i>
+            <i class="hilos__hilo hilos__hilo--fino"></i>
+            <i class="hilos__hilo hilos__hilo--medio"></i>
+          </span>
+          <span class="grupo__etiqueta">{{ grupo.etiqueta }}</span>
+        </h2>
+
+        <ul class="grupo__lista">
+          @for (modulo of grupo.modulos; track modulo.codigo) {
+            <li>
+              @if (modulo.estado === 'disponible' && modulo.rutaPrincipal) {
+                <a
+                  class="enlace"
+                  [routerLink]="modulo.rutaPrincipal"
+                  routerLinkActive="enlace--activo"
+                  [attr.title]="colapsada() ? modulo.etiqueta : null"
+                  (click)="alNavegar()"
+                >
+                  <span class="enlace__hilo" aria-hidden="true"></span>
+                  <app-icono class="enlace__icono" [nombre]="modulo.icono" [tamano]="19" />
+                  <span class="enlace__texto">{{ modulo.etiqueta }}</span>
+                </a>
+              } @else {
+                <!--
+                  Con permiso pero sin pantalla todavía. Es un <span>, no un
+                  <a> deshabilitado: un enlace que no lleva a ninguna parte no
+                  debería estar en el orden de tabulación ni anunciarse como
+                  enlace.
+                -->
+                <span
+                  class="enlace enlace--pendiente"
+                  [attr.title]="modulo.etiqueta + ' — en construcción'"
+                >
+                  <span class="enlace__hilo" aria-hidden="true"></span>
+                  <app-icono class="enlace__icono" [nombre]="modulo.icono" [tamano]="19" />
+                  <span class="enlace__texto">{{ modulo.etiqueta }}</span>
+                  <span class="enlace__pronto">pronto</span>
+                </span>
+              }
+            </li>
+          }
+        </ul>
+      </section>
+    } @empty {
+      <!--
+        Estado vacío de la barra: un rol sin ningún módulo habilitado. Pasa de
+        verdad si super_admin apaga todo para una instalación, y quedarse en
+        blanco dejaría a la persona sin saber si es un error o su configuración.
+      -->
+      <p class="barra__vacia">
+        Tu rol todavía no tiene módulos habilitados. Pídele a la coordinación que
+        los active.
+      </p>
+    }
+  </div>
+
+  <div class="barra__pie">
+    @if (usuario()?.sede; as sede) {
+      <div class="sede">
+        <app-icono
+          class="sede__estrella"
+          nombre="estrella"
+          [relleno]="sede.esPrincipal"
+          [tamano]="16"
+          [etiqueta]="sede.esPrincipal ? 'Sede principal' : 'Escuela satélite'"
+        />
+        <span class="sede__texto">
+          <span class="sede__nombre">{{ sede.nombre }}</span>
+          <!--
+            La segunda línea solo aparece si agrega algo. En la sede principal el
+            nombre ya dice lo que es ("Sede Principal / Sede principal" era pura
+            repetición); en una escuela satélite, en cambio, la vereda es el dato
+            que ubica de verdad, y no está en el nombre.
+          -->
+          @if (!sede.esPrincipal && sede.vereda) {
+            <span class="sede__tipo">Vereda {{ sede.vereda }}</span>
+          }
+        </span>
+      </div>
+    }
+
+    <button
+      type="button"
+      class="barra__alternar"
+      (click)="alternar()"
+      [attr.aria-expanded]="!colapsada()"
+      [attr.aria-label]="colapsada() ? 'Expandir la navegación' : 'Contraer la navegación'"
+    >
+      <app-icono nombre="panel" [tamano]="18" />
+      <span class="barra__alternar-texto">Contraer</span>
+    </button>
+  </div>
+</nav>

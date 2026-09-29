@@ -1,0 +1,56 @@
+<header class="superior">
+  <!-- Solo en móvil: abre la barra lateral, que ahí es un panel que tapa. -->
+  <button
+    type="button"
+    class="superior__menu-movil"
+    (click)="abrirMenuMovil()"
+    aria-label="Abrir la navegación"
+  >
+    <app-icono nombre="lista" [tamano]="20" />
+  </button>
+
+  @if (periodo(); as p) {
+    <!--
+      La regla de período. `role="group"` con aria-label en vez de dejar que un
+      lector de pantalla lea cuatro segmentos sueltos sin contexto; el detalle
+      completo va en el texto visible de al lado, que también se anuncia.
+    -->
+    <div class="periodo" role="group" [attr.aria-label]="'Período académico ' + p.nombre">
+      <span class="periodo__rotulo">Período</span>
+
+      <span class="periodo__regla">
+        @for (numero of segmentos; track numero) {
+          <span
+            class="periodo__segmento"
+            [class.periodo__segmento--actual]="numero === p.numero"
+            [class.periodo__segmento--cursado]="numero < p.numero"
+            aria-hidden="true"
+          ></span>
+        }
+      </span>
+
+      <span class="periodo__codigo">{{ p.nombre }}</span>
+
+      <span class="periodo__plazo" [attr.data-tono]="tonoPlazo()">
+        <app-icono
+          [nombre]="tonoPlazo() === 'normal' ? 'visto' : 'alerta'"
+          [tamano]="15"
+        />
+        <span>{{ textoPlazo() }}</span>
+      </span>
+    </div>
+  } @else {
+    <!--
+      Sin período activo: pasa de verdad entre el cierre de un año escolar y la
+      apertura del siguiente. Se dice, en vez de dejar el hueco en blanco.
+    -->
+    <div class="periodo periodo--sin-activo">
+      <app-icono nombre="alerta" [tamano]="15" />
+      <span>Sin período académico abierto</span>
+    </div>
+  }
+
+  @if (usuario(); as u) {
+    <app-menu-usuario class="superior__usuario" [usuario]="u" />
+  }
+</header>

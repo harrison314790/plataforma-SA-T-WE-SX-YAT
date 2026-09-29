@@ -1,0 +1,94 @@
+<div class="escritorio">
+  <header class="escritorio__cabecera">
+    @if (contexto()) {
+      <p class="escritorio__contexto">{{ contexto() }}</p>
+    }
+
+    <h1 class="escritorio__titulo">
+      @if (usuario(); as u) {
+        {{ u.nombres }}, este es tu sistema
+      } @else {
+        Tu sistema
+      }
+    </h1>
+
+    <p class="escritorio__resumen">
+      Puedes entrar a <strong>{{ disponibles() }}</strong> de los
+      <strong>{{ total() }}</strong> módulos de la institución. Los demás
+      dependen de tu rol o todavía se están construyendo.
+    </p>
+  </header>
+
+  <!--
+    Rejilla de fichas, no tarjetas flotantes: borde de 1px, sin sombra y sin
+    hover-lift. Es un ERP, no una página de producto -- lo único que se mueve al
+    pasar el puntero es el borde, que pasa a turquesa de interacción.
+  -->
+  <ul class="fichas">
+    @for (modulo of modulos(); track modulo.codigo) {
+      <li>
+        @if (modulo.estado === 'disponible' && modulo.rutaPrincipal) {
+          <a class="ficha" [routerLink]="modulo.rutaPrincipal">
+            <!--
+              El mismo tramo de hilos de la barra lateral. El número de hilos
+              cambia por grupo, así cada familia de módulos tiene una firma
+              propia sin introducir un color nuevo que competiría con la
+              semántica de las notas.
+            -->
+            <span class="hilos hilos--ficha" aria-hidden="true">
+              <i class="hilos__hilo hilos__hilo--fino"></i>
+              <i class="hilos__hilo hilos__hilo--grueso"></i>
+              <i class="hilos__hilo hilos__hilo--fino"></i>
+              <i class="hilos__hilo hilos__hilo--medio"></i>
+            </span>
+
+            <app-icono class="ficha__icono" [nombre]="modulo.icono" [tamano]="24" />
+
+            <h2 class="ficha__titulo">{{ modulo.etiqueta }}</h2>
+            <p class="ficha__grupo">{{ modulo.grupo }}</p>
+
+            <ul class="ficha__vistas">
+              @for (vista of modulo.vistas; track vista.codigo) {
+                <li>{{ vista.etiqueta }}</li>
+              }
+            </ul>
+
+            <span class="ficha__entrar">
+              Entrar
+              <app-icono nombre="chevron" [tamano]="14" />
+            </span>
+          </a>
+        } @else {
+          <div class="ficha ficha--inactiva" [attr.data-estado]="modulo.estado">
+            <span class="hilos hilos--ficha" aria-hidden="true">
+              <i class="hilos__hilo hilos__hilo--fino"></i>
+              <i class="hilos__hilo hilos__hilo--grueso"></i>
+              <i class="hilos__hilo hilos__hilo--fino"></i>
+              <i class="hilos__hilo hilos__hilo--medio"></i>
+            </span>
+
+            <app-icono class="ficha__icono" [nombre]="modulo.icono" [tamano]="24" />
+
+            <h2 class="ficha__titulo">{{ modulo.etiqueta }}</h2>
+            <p class="ficha__grupo">{{ modulo.grupo }}</p>
+
+            <p class="ficha__motivo">{{ motivo(modulo.estado) }}</p>
+          </div>
+        }
+      </li>
+    } @empty {
+      <!--
+        Estado vacío del escritorio: la institución no tiene ni un módulo
+        activo. Solo pasa si super_admin los apagó todos, y es una invitación a
+        actuar, no un "No hay datos".
+      -->
+      <li class="fichas__vacio">
+        <app-icono nombre="libro" [tamano]="28" />
+        <p>
+          Todavía no hay módulos activos en esta instalación. El superadministrador
+          los habilita desde Roles y permisos.
+        </p>
+      </li>
+    }
+  </ul>
+</div>

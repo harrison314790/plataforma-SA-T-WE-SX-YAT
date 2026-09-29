@@ -1,0 +1,43 @@
+<!--
+  Primer elemento enfocable de la página: deja saltar los ~15 ítems de
+  navegación de una vez. Invisible hasta que recibe foco por teclado.
+-->
+<a class="salto-contenido" href="#contenido">Saltar al contenido</a>
+
+<div
+  class="shell"
+  [class.shell--barra-colapsada]="navegacion.colapsada()"
+  [class.shell--barra-abierta]="navegacion.abiertaEnMovil()"
+>
+  <app-barra-lateral class="shell__barra" />
+
+  <!--
+    Solo en móvil, y solo con la barra abierta: el velo cierra el panel al
+    toque. No lleva rol de botón ni foco porque Escape y el propio ítem de
+    navegación ya cierran; es una comodidad táctil, no la única salida.
+  -->
+  @if (navegacion.abiertaEnMovil()) {
+    <div class="shell__velo" (click)="navegacion.cerrarEnMovil()" aria-hidden="true"></div>
+  }
+
+  <div class="shell__cuerpo">
+    <app-barra-superior />
+
+    @if (!conexion.enLinea()) {
+      <!--
+        Persistente y NO bloqueante, a propósito: el profesor tiene que poder
+        seguir digitando notas con la señal caída. Un modal acá le costaría una
+        hora de trabajo. El mensaje es el mismo contrato que promete el punto de
+        "sin guardar" de la celda.
+      -->
+      <p class="aviso-sin-conexion" role="status">
+        <app-icono nombre="alerta" [tamano]="16" />
+        <span>Sin conexión — tus cambios se guardarán cuando vuelva la señal.</span>
+      </p>
+    }
+
+    <main class="shell__contenido" id="contenido">
+      <router-outlet />
+    </main>
+  </div>
+</div>
