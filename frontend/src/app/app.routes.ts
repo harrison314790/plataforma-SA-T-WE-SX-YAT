@@ -55,6 +55,14 @@ export const routes: Routes = [
       },
 
       {
+        path: 'asignaciones',
+        canActivate: [tienePermisoGuard('vista_asignaciones')],
+        title: 'Asignaciones · Sistema Académico',
+        loadChildren: () =>
+          import('./features/asignaciones/asignaciones.routes').then((m) => m.ASIGNACIONES_ROUTES),
+      },
+
+      {
         path: 'matriculas',
         canActivate: [tienePermisoGuard('vista_matriculas')],
         title: 'Matrículas · Sistema Académico',

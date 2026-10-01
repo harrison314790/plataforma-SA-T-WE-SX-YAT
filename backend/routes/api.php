@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AsignacionController;
 use App\Http\Controllers\Api\V1\AutenticacionController;
 use App\Http\Controllers\Api\V1\NavegacionController;
 use App\Http\Controllers\Api\V1\NotaController;
+use App\Http\Controllers\Api\V1\OfertaGradoController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -56,9 +58,84 @@ Route::prefix('v1')->group(function () {
         Route::post('/notas', [NotaController::class, 'store'])
             ->middleware('requiere.permiso:btn_registrar_nota');
 
+        /*
+         * ASIGNACIONES -- quién dicta qué, por grado, grupo y AÑO.
+         *
+         * `vista_asignaciones` se exige en TODO el grupo, incluidas las
+         * escrituras: el permiso de vista es la puerta del módulo, y los
+         * códigos de botón (`btn_*`) son el permiso fino de cada acción
+         * dentro de él. Sin esto, un rol al que se le quitara la vista
+         * pero le quedara un `btn_*` habilitado por olvido podría seguir
+         * escribiendo por API en un módulo que ya no puede abrir.
+         *
+         * `/opciones` va ANTES de `/{asignacion}` y no es un detalle de
+         * estilo: con el orden invertido, Laravel intentaría resolver la
+         * palabra "opciones" como el id de una asignación.
+         *
+         * Los tres códigos de botón son distintos a propósito -- crear y
+         * editar son reversibles, eliminar no. Ver el paso 6 de
+         * 11-asignaciones-modulo.sql.
+         */
+        Route::prefix('asignaciones')
+            ->middleware('requiere.permiso:vista_asignaciones')
+            ->group(function () {
+                Route::get('/opciones', [AsignacionController::class, 'opciones']);
+                Route::get('/', [AsignacionController::class, 'index']);
+
+                Route::post('/', [AsignacionController::class, 'store'])
+                    ->middleware('requiere.permiso:btn_crear_asignacion');
+
+                Route::put('/{asignacion}', [AsignacionController::class, 'update'])
+                    ->middleware('requiere.permiso:btn_editar_asignacion');
+
+                // Desactivar/reactivar va con `btn_editar_asignacion`, no
+                // con `btn_eliminar_asignacion`: es reversible y no
+                // destruye nada. Tampoco tiene código propio, porque no
+                // es una acción suelta de ninguna pantalla -- se llega
+                // solo desde el diálogo de eliminar, como la alternativa
+                // cuando la asignación tiene notas.
+                Route::patch('/{asignacion}/activo', [AsignacionController::class, 'cambiarEstado'])
+                    ->middleware('requiere.permiso:btn_editar_asignacion');
+
+                Route::delete('/{asignacion}', [AsignacionController::class, 'destroy'])
+                    ->middleware('requiere.permiso:btn_eliminar_asignacion');
+            });
+
+        /*
+         * OFERTA DE GRADOS -- qué grado+grupo existe en cada sede.
+         *
+         * Recurso propio y no un sub-recurso de `asignaciones`: la misma
+         * tabla la va a usar Matrículas, y anidarlo bajo /asignaciones
+         * habría atado el catálogo al primer módulo que lo necesitó.
+         *
+         * La puerta es `vista_asignaciones` y eso SÍ es temporal: hoy es
+         * la única pantalla desde donde se administra. Cuando exista
+         * Matrículas hay que decidir si esto pasa a un módulo de
+         * configuración con su propio código de vista, en vez de heredar
+         * este por inercia.
+         *
+         * Un solo `btn_gestionar_grados` para crear, desactivar y
+         * eliminar -- el porqué (la FK compuesta ya impide borrar lo que
+         * está en uso) está en 12-gestion-oferta-grados.sql.
+         */
+        Route::prefix('oferta-grados')
+            ->middleware('requiere.permiso:vista_asignaciones')
+            ->group(function () {
+                Route::get('/', [OfertaGradoController::class, 'index']);
+
+                Route::post('/', [OfertaGradoController::class, 'store'])
+                    ->middleware('requiere.permiso:btn_gestionar_grados');
+
+                Route::patch('/{ofertaGrado}/activo', [OfertaGradoController::class, 'cambiarEstado'])
+                    ->middleware('requiere.permiso:btn_gestionar_grados');
+
+                Route::delete('/{ofertaGrado}', [OfertaGradoController::class, 'destroy'])
+                    ->middleware('requiere.permiso:btn_gestionar_grados');
+            });
+
         // Los próximos módulos (usuarios, sedes, asignaturas, períodos,
-        // asignaciones, matrículas, recursos/permisos) van acá, con el
-        // mismo patrón: dentro de este grupo 'auth.rls', y con
+        // matrículas, recursos/permisos) van acá, con el mismo patrón:
+        // dentro de este grupo 'auth.rls', y con
         // 'requiere.permiso:codigo' o 'requiere.superadmin' según
         // corresponda -- ver permisos.md para qué código usa cada uno.
     });

@@ -1,0 +1,207 @@
+<div class="modal" role="presentation" (click)="cerrar.emit()">
+  <div
+    class="modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="titulo-grados"
+    appModal
+    (cerrarModal)="cerrar.emit()"
+    (click)="$event.stopPropagation()"
+  >
+    <header class="modal__cabecera">
+      <div>
+        <h2 class="modal__titulo" id="titulo-grados">Grados y grupos</h2>
+        <p class="modal__subtitulo">
+          Qué grados y grupos existen en cada sede. Es lo que pueden elegir las
+          asignaciones y, más adelante, las matrículas.
+        </p>
+      </div>
+
+      <button type="button" class="modal__cerrar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <app-icono nombre="equis" [tamano]="20" />
+      </button>
+    </header>
+
+    <div class="modal__cuerpo">
+      <!-- El alta va ARRIBA y en una sola fila: es la acción que trae a la
+           gente a este modal, y dejarla al final obligaría a pasar por
+           toda la lista para llegar. -->
+      <form class="alta-grado" (ngSubmit)="crear()">
+        <label class="campo">
+          <span class="campo__rotulo">Sede</span>
+          <select
+            class="campo__control"
+            [value]="nuevaSede() ?? ''"
+            (change)="elegirSede($any($event.target).value)"
+          >
+            <option value="" [selected]="nuevaSede() === null">Elige una sede</option>
+            @for (sede of sedes(); track sede.id) {
+              <option [selected]="nuevaSede() === sede.id" [value]="sede.id">{{ sede.nombre }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="campo campo--estrecho">
+          <span class="campo__rotulo">Grado</span>
+          <select
+            class="campo__control"
+            [value]="nuevoGrado() ?? ''"
+            (change)="elegirGrado($any($event.target).value)"
+          >
+            <option value="" [selected]="nuevoGrado() === null">—</option>
+            @for (g of gradosPosibles; track g) {
+              <option [selected]="nuevoGrado() === g" [value]="g">{{ g }}°</option>
+            }
+          </select>
+        </label>
+
+        <label class="campo campo--estrecho">
+          <span class="campo__rotulo">Grupo</span>
+          <!-- Se normaliza mientras se escribe (mayúscula, sin tilde):
+               el campo muestra desde el primer carácter exactamente lo
+               que se va a guardar, en vez de transformarlo por detrás al
+               pulsar Agregar. -->
+          <input
+            class="campo__control campo__control--codigo"
+            type="text"
+            maxlength="10"
+            placeholder="A"
+            autocapitalize="characters"
+            [value]="nuevoGrupo()"
+            (input)="escribirGrupo($any($event.target).value)"
+          />
+        </label>
+
+        <button type="submit" class="boton boton--secundario" [disabled]="!puedeCrear()">
+          Agregar
+        </button>
+      </form>
+
+      <!-- El grupo se guarda en mayúscula: sin eso, 'a' y 'A' serían dos
+           aulas distintas para la base y ninguna consulta las juntaría. -->
+      <p class="campo__ayuda">
+        Una escuela de vereda con un aula por grado usa <strong>UNICO</strong> como
+        grupo. Se guarda siempre en <strong>mayúscula y sin tildes</strong>, para que
+        “único”, “Único” y “UNICO” no terminen siendo tres aulas distintas.
+      </p>
+
+      @if (errorDe('grupo'); as mensaje) {
+        <p class="aviso aviso--error" role="alert">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>{{ mensaje }}</span>
+        </p>
+      }
+      @if (errorDe('sede_id'); as mensaje) {
+        <p class="aviso aviso--error" role="alert">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>{{ mensaje }}</span>
+        </p>
+      }
+      @if (error(); as mensaje) {
+        <p class="aviso aviso--error" role="alert">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>{{ mensaje }}</span>
+        </p>
+      }
+
+      @if (cargando()) {
+        <div class="estado-cargando" aria-busy="true" aria-label="Cargando">
+          <div class="estado-cargando__fila"></div>
+          <div class="estado-cargando__fila"></div>
+          <div class="estado-cargando__fila"></div>
+        </div>
+      } @else if (porSede().length === 0) {
+        <p class="aviso">
+          Todavía no hay ningún grado dado de alta. Agregá el primero con el
+          formulario de arriba.
+        </p>
+      } @else {
+        <!-- Agrupado por sede: la pregunta real es "¿hasta dónde llega La
+             Laguna?", y una lista plana no la responde sin leerla entera. -->
+        @for (grupo of porSede(); track grupo.sede.id) {
+          <section class="grados-sede">
+            <h3 class="grados-sede__titulo">
+              <app-icono nombre="estrella" [tamano]="14" [relleno]="grupo.sede.esPrincipal" />
+              {{ grupo.sede.nombre }}
+            </h3>
+
+            <ul class="grados-lista">
+              @for (fila of grupo.filas; track fila.id) {
+                <li class="grados-lista__fila" [class.grados-lista__fila--inactiva]="!fila.activo">
+                  <span class="grados-lista__codigo">{{ fila.grado }}-{{ fila.grupo }}</span>
+
+                  <span class="grados-lista__detalle">
+                    @if (!fila.activo) {
+                      <span class="etiqueta etiqueta--inactiva">Inactivo</span>
+                    }
+                    @if (textoUsos(fila); as usos) {
+                      {{ usos }}
+                      <!-- Nunca color solo: la etiqueta dice lo mismo que
+                           el tono. Con notas adentro, desactivar no es
+                           "lo que queda" sino lo único correcto: borrar
+                           rompería boletines de alumnos concretos. -->
+                      @if (tieneNotas(fila)) {
+                        <span class="etiqueta etiqueta--aviso">Con notas</span>
+                      }
+                    } @else {
+                      Sin usar
+                    }
+                  </span>
+
+                  <span class="grados-lista__acciones">
+                    @if (!fila.activo) {
+                      <!-- Color propio, distinto del de "Desactivar": es
+                           la única acción de esta lista que DEVUELVE algo
+                           a circulación -- sus dos vecinas lo sacan o lo
+                           destruyen. Y aparece sobre una fila atenuada,
+                           donde el turquesa de las otras se pierde contra
+                           el gris. -->
+                      <button
+                        type="button"
+                        class="boton boton--enlace boton--enlace-restaurar"
+                        [disabled]="guardando()"
+                        (click)="cambiarEstado(fila, true)"
+                      >
+                        Reactivar
+                      </button>
+                    } @else if (totalUsos(fila) > 0) {
+                      <!-- Con historial, eliminar no es posible: la llave
+                           foránea lo bloquea. Se ofrece lo que sí funciona. -->
+                      <button
+                        type="button"
+                        class="boton boton--enlace"
+                        [disabled]="guardando()"
+                        (click)="cambiarEstado(fila, false)"
+                      >
+                        Desactivar
+                      </button>
+                    } @else {
+                      <button
+                        type="button"
+                        class="boton boton--enlace boton--enlace-peligro"
+                        [disabled]="guardando()"
+                        (click)="eliminar(fila)"
+                      >
+                        Eliminar
+                      </button>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+          </section>
+        }
+      }
+    </div>
+
+    <footer class="modal__pie">
+      <!-- Primario y no fantasma: acá "Listo" no es "cancelar", es LA
+           acción de la pantalla -- no hay nada que confirmar porque cada
+           fila ya se guardó sola al pulsarla. Un botón gris y chico
+           invitaba a buscar un "Guardar" que no existe. Mismo peso
+           visual que "Nueva asignación", que es el otro botón que cierra
+           un paso completo. -->
+      <button type="button" class="boton boton--primario" (click)="cerrar.emit()">Listo</button>
+    </footer>
+  </div>
+</div>

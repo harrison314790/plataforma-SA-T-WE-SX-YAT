@@ -1,0 +1,269 @@
+@if (sinPermiso()) {
+  <!-- Cuarto de los cinco estados. Se llega acá si el permiso se apaga
+       con la pestaña ya abierta: el guard de ruta solo mira al entrar. -->
+  <app-sin-permiso />
+} @else {
+  <section class="asignaciones">
+    <!--
+      CABECERA EN UNA LÍNEA. El párrafo de tres renglones que había acá
+      explicaba el módulo a quien ya sabe para qué entró -- se lee una vez
+      y después estorba todos los días. Lo que de verdad hacía falta decir
+      ("vale para el año completo, no por período") vive ahora donde se
+      necesita: dentro del formulario, en el momento de decidir.
+
+      Las acciones van arriba a la derecha, en el orden en que se usan:
+      "Nueva asignación" es el trabajo diario y va primero, con relleno;
+      "Grados y grupos" es configuración ocasional y va al lado, con
+      contorno. Dos pesos visuales distintos para no hacer competir dos
+      botones que no valen lo mismo.
+    -->
+    <header class="asignaciones__cabecera">
+      <h1 class="asignaciones__titulo">
+        Asignaciones
+        <span class="asignaciones__ayuda">
+          · qué asignatura dicta cada profesor, en qué grado, grupo y sede —
+          vigente todo el año escolar
+        </span>
+      </h1>
+
+      <div class="asignaciones__acciones">
+        <!-- Su propio permiso: es el único punto del módulo que escribe
+             en una tabla que no es `asignaciones`. -->
+        <button
+          *appHasRole="'btn_gestionar_grados'"
+          type="button"
+          class="boton boton--secundario"
+          [disabled]="!enLinea()"
+          (click)="abrirGestionGrados()"
+        >
+          Grados y grupos
+        </button>
+
+        <!-- Capa 1 de seguridad: oculta el botón. El mismo código lo
+             verifica Laravel (`requiere.permiso:btn_crear_asignacion`) y lo
+             respalda la política RLS de `asignaciones` -- las tres capas o
+             ninguna. -->
+        <button
+          *appHasRole="'btn_crear_asignacion'"
+          type="button"
+          class="boton boton--primario"
+          [disabled]="!enLinea()"
+          [title]="enLinea() ? '' : 'Sin conexión: no se puede crear una asignación ahora'"
+          (click)="abrirAlta()"
+        >
+          Nueva asignación
+        </button>
+      </div>
+    </header>
+
+    <app-filtros-asignaciones
+      [opciones]="opciones()"
+      [filtros]="filtros()"
+      [resultados]="cargando() ? null : asignaciones().length"
+      (cambio)="aplicarFiltros($event)"
+      (limpiar)="limpiarFiltros()"
+    />
+
+    @if (aviso(); as mensaje) {
+      <p class="aviso aviso--ok" role="status">
+        <app-icono nombre="visto" [tamano]="16" />
+        <span>{{ mensaje }}</span>
+      </p>
+    }
+
+    <!-- Un fallo al reactivar una fila NO reemplaza la tabla: se avisa
+         acá arriba y la tabla sigue donde estaba. -->
+    @if (errorDeAccion(); as mensaje) {
+      <p class="aviso aviso--error" role="alert">
+        <app-icono nombre="alerta" [tamano]="16" />
+        <span>{{ mensaje }}</span>
+      </p>
+    }
+
+    @if (cargando()) {
+      <app-estado-cargando [filas]="6" />
+    } @else if (error() !== null) {
+      <!-- `as` no se puede usar en un `@else if` (NG5002), de ahí el `!`. -->
+      <app-estado-error [mensaje]="error()!" (reintentar)="cargar()" />
+    } @else if (asignaciones().length === 0) {
+      <!-- Dos vacíos distintos porque tienen salidas opuestas: sin filtros,
+           lo que falta es crear la primera; con filtros, lo que sobra son
+           los filtros. Un único "No hay datos" mandaría a la mitad de la
+           gente al lado equivocado. -->
+      @if (hayFiltros()) {
+        <app-estado-vacio
+          mensaje="Ninguna asignación coincide con estos filtros."
+          textoAccion="Limpiar filtros"
+          (accion)="limpiarFiltros()"
+        />
+      } @else {
+        <app-estado-vacio
+          mensaje="Todavía no hay asignaciones cargadas. El primer paso del año escolar es decir qué dicta cada profesor."
+          textoAccion="Crear la primera asignación"
+          (accion)="abrirAlta()"
+        />
+      }
+    } @else {
+      <!--
+        Tabla HTML de verdad (`<table>`), no una grilla de divs con roles
+        ARIA como traía el diseño: esto ES una tabla de datos, y el
+        elemento nativo ya trae navegación por filas y columnas en lector
+        de pantalla sin que haya que reconstruirla a mano.
+
+        Sin paginación y sin zebra striping, según el sistema de diseño:
+        líneas de 1px y resaltado al pasar el puntero alcanzan. El
+        contenedor con scroll propio evita que la página entera se mueva
+        de lado en un teléfono.
+      -->
+      <div class="tabla-contenedor">
+        <table class="tabla">
+          <caption class="tabla__leyenda">
+            Asignaciones que coinciden con los filtros, ordenadas por grado, grupo y asignatura.
+          </caption>
+
+          <thead>
+            <tr>
+              <th scope="col">Profesor</th>
+              <th scope="col">Asignatura</th>
+              <th scope="col" class="tabla__col-corta">Grado</th>
+              <th scope="col" class="tabla__col-corta">Grupo</th>
+              <th scope="col">Sede</th>
+              <th scope="col" class="tabla__col-corta">Año</th>
+              <th scope="col" class="tabla__col-acciones">Acciones</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (asignacion of asignaciones(); track asignacion.id) {
+              <tr [class.tabla__fila--inactiva]="!asignacion.activo">
+                <th scope="row" class="tabla__celda-nombre">
+                  {{ asignacion.profesor.nombreCompleto }}
+
+                  <!-- Nunca color solo: la etiqueta dice lo mismo que el
+                       tono, para quien tenga alguna forma de daltonismo. -->
+                  @if (!asignacion.activo) {
+                    <span class="etiqueta etiqueta--inactiva">Inactiva</span>
+                  }
+                  @if (!asignacion.profesor.activo) {
+                    <span class="etiqueta etiqueta--aviso">Profesor inactivo</span>
+                  }
+                </th>
+
+                <td>{{ asignacion.asignatura.nombre }}</td>
+                <td class="tabla__celda-numerica">{{ asignacion.grado }}°</td>
+                <td class="tabla__celda-numerica">{{ asignacion.grupo }}</td>
+
+                <td class="tabla__celda-sede">
+                  <app-icono
+                    nombre="estrella"
+                    [tamano]="14"
+                    [relleno]="asignacion.sede.esPrincipal"
+                  />
+                  {{ asignacion.sede.nombre }}
+                </td>
+
+                <td class="tabla__celda-numerica">{{ asignacion.anio }}</td>
+
+                <!--
+                  ACCIONES DEFINIDAS EN LA BASE.
+
+                  El rótulo y el ícono de cada botón salen de `recursos`
+                  (14-acciones-de-tabla.sql) vía `accion(codigo)`;
+                  quién las ve, del mapa de permisos del login
+                  (`*appHasRole`); y qué hacen, de este componente.
+                  Renombrar "Eliminar" o cambiarle el ícono es un update
+                  en la base, no un despliegue.
+
+                  Lo que la base NO decide es qué hace cada botón: eso es
+                  comportamiento, no configuración.
+
+                  NO hay botón de desactivar acá, y es deliberado:
+                  desactivar es la alternativa que ofrece el diálogo de
+                  eliminar cuando la asignación tiene notas, no una
+                  acción que se elija de entrada desde la fila.
+
+                  Antes "Eliminar…" iba con el permiso de EDITAR -- un rol
+                  con edición pero sin borrado lo veía igual y chocaba
+                  contra un 403. Ahora lleva su propio código.
+                -->
+                <td class="tabla__celda-acciones">
+                  <button
+                    *appHasRole="'btn_editar_asignacion'"
+                    type="button"
+                    class="accion"
+                    [title]="accion('btn_editar_asignacion').etiqueta"
+                    (click)="abrirEdicion(asignacion)"
+                  >
+                    @if (accion('btn_editar_asignacion').icono; as icono) {
+                      <app-icono [nombre]="icono" [tamano]="16" />
+                    }
+                    <span class="accion__texto">{{ accion('btn_editar_asignacion').etiqueta }}</span>
+                  </button>
+
+                  <!-- Última de la fila a propósito: es la única
+                       irreversible, lejos del puntero que viene de
+                       pulsar la otra. -->
+                  <button
+                    *appHasRole="'btn_eliminar_asignacion'"
+                    type="button"
+                    class="accion accion--peligro"
+                    [title]="accion('btn_eliminar_asignacion').etiqueta"
+                    (click)="abrirBorrado(asignacion)"
+                  >
+                    @if (accion('btn_eliminar_asignacion').icono; as icono) {
+                      <app-icono [nombre]="icono" [tamano]="16" />
+                    }
+                    <span class="accion__texto">{{ accion('btn_eliminar_asignacion').etiqueta }}</span>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+}
+
+<!-- Anidado y no `@if (formularioAbierto() && opciones(); as ...)`: esa
+     forma deja el tipo en `Opciones | null | false` y el template
+     estricto la rechaza. Anidar dice lo mismo y conserva el tipo. -->
+@if (formularioAbierto()) {
+  @if (opciones(); as catalogos) {
+    <app-formulario-asignacion
+      [opciones]="catalogos"
+      [asignacion]="enFormulario()"
+      [guardando]="guardando()"
+      [errores]="erroresDeCampo()"
+      [errorGeneral]="errorDelFormulario()"
+      [sinConexion]="!enLinea()"
+      (guardar)="guardarFormulario($event)"
+      (cerrar)="cerrarFormulario()"
+    />
+  }
+}
+
+<!-- Anidado por lo mismo que el formulario: `a() && b(); as x` deja el
+     tipo en `T | null | false` y el template estricto lo rechaza. -->
+@if (gestionGradosAbierta()) {
+  @if (opciones(); as catalogos) {
+    <app-gestion-grados
+      [sedes]="catalogos.sedes"
+      [sedeSugerida]="filtros().sedeId"
+      (cambio)="recargarOpciones()"
+      (cerrar)="cerrarGestionGrados()"
+    />
+  }
+}
+
+@if (enBorrado(); as asignacion) {
+  <app-dialogo-eliminar-asignacion
+    [asignacion]="asignacion"
+    [guardando]="guardando()"
+    [error]="errorDelBorrado()"
+    (eliminar)="eliminar()"
+    (desactivar)="desactivarDesdeDialogo()"
+    (reactivar)="reactivarDesdeDialogo()"
+    (cerrar)="cerrarBorrado()"
+  />
+}

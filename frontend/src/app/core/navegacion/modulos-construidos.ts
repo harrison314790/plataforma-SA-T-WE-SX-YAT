@@ -18,7 +18,7 @@
  * cambiando el `loadComponent` de `modulo-en-construccion` por el real. El
  * menú y el escritorio se actualizan solos.
  */
-export const RUTAS_CONSTRUIDAS: ReadonlySet<string> = new Set(['/notas']);
+export const RUTAS_CONSTRUIDAS: ReadonlySet<string> = new Set(['/notas', '/asignaciones']);
 
 export function estaConstruida(ruta: string | null | undefined): boolean {
   return ruta != null && RUTAS_CONSTRUIDAS.has(ruta);

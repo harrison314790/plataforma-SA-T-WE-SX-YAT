@@ -35,6 +35,11 @@ class RegistrarNotaRequest extends FormRequest
         return [
             'estudiante_id' => ['required', 'uuid', 'exists:estudiantes,id'],
             'asignacion_id' => ['required', 'uuid', 'exists:asignaciones,id'],
+            // Obligatorio desde 09-asignaciones-por-anio.sql: una
+            // asignación ahora cubre los 4 períodos del año, así que ya no
+            // hay forma de inferir a cuál de los 4 pertenece esta nota sin
+            // que el cliente lo diga explícitamente.
+            'periodo_id' => ['required', 'integer', 'exists:periodos_academicos,id'],
             'valor' => ['required', 'numeric', 'between:1.0,5.0'],
         ];
     }

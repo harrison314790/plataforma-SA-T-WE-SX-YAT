@@ -1,0 +1,230 @@
+<!--
+  `[selected]` por opción además del `[value]` del select: al EDITAR, las
+  listas de grupo y asignatura se recalculan a partir del grado que el
+  efecto acaba de fijar, así que pueden pintarse después de que el
+  `[value]` ya corrió. Sin esto, abrir "Editar" mostraría el grupo y la
+  materia en blanco aunque la asignación los tenga. Mismo arreglo que en
+  la barra de filtros, donde el bug se vio primero.
+-->
+<div class="modal" role="presentation" (click)="cerrar.emit()">
+  <div
+    class="modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="titulo-formulario"
+    appModal
+    (cerrarModal)="cerrar.emit()"
+    (click)="$event.stopPropagation()"
+  >
+    <header class="modal__cabecera">
+      <div>
+        <h2 class="modal__titulo" id="titulo-formulario">
+          {{ esEdicion() ? 'Editar asignación' : 'Nueva asignación' }}
+        </h2>
+        <p class="modal__subtitulo">
+          Vale para el año escolar completo. La nota de cada período se registra
+          aparte, en el módulo de Notas.
+        </p>
+      </div>
+
+      <button type="button" class="modal__cerrar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <app-icono nombre="equis" [tamano]="20" />
+      </button>
+    </header>
+
+    <form class="modal__cuerpo formulario" (ngSubmit)="enviar(false)">
+      <label class="campo">
+        <span class="campo__rotulo">Profesor <span class="campo__obligatorio">*</span></span>
+        <select
+          class="campo__control"
+          [value]="profesorId() ?? ''"
+          (change)="elegirProfesor($any($event.target).value)"
+        >
+          <option value="" [selected]="profesorId() === null">Elige un profesor</option>
+          @for (profesor of profesores(); track profesor.id) {
+            <option [selected]="profesorId() === profesor.id" [value]="profesor.id">
+              {{ profesor.nombreCompleto }}@if (profesor.sede) { · {{ profesor.sede.nombre }} }
+            </option>
+          }
+        </select>
+        @if (errorDe('profesor_id'); as mensaje) {
+          <span class="campo__error">{{ mensaje }}</span>
+        }
+      </label>
+
+      <!--
+        La sede NO es un campo: es la consecuencia de haber elegido al
+        profesor. Se muestra igual, y bien visible, porque es el dato que
+        determina qué grados y grupos se van a poder elegir abajo.
+      -->
+      <div class="campo campo--derivado">
+        <span class="campo__rotulo">Sede</span>
+        <div class="campo__valor">
+          @if (sede(); as s) {
+            <app-icono nombre="estrella" [tamano]="15" [relleno]="s.esPrincipal" />
+            <span>{{ s.nombre }}</span>
+            @if (s.vereda && !s.esPrincipal) {
+              <span class="campo__valor-detalle">· vereda {{ s.vereda }}</span>
+            }
+          } @else {
+            <span class="campo__valor-vacio">Aparece sola al elegir el profesor</span>
+          }
+        </div>
+        <span class="campo__ayuda">Se toma del profesor. No se edita acá.</span>
+        @if (errorDe('sede_id'); as mensaje) {
+          <span class="campo__error">{{ mensaje }}</span>
+        }
+      </div>
+
+      @if (profesorSinSede()) {
+        <p class="aviso aviso--error" role="alert">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>
+            Este profesor no tiene sede en su ficha de usuario, así que no se le
+            puede dar una asignación. Hay que corregirla primero en Usuarios.
+          </span>
+        </p>
+      }
+
+      @if (sedeSinOferta()) {
+        <p class="aviso aviso--error" role="alert">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>
+            Esta sede no tiene ningún grado y grupo abierto todavía. Hay que darlos
+            de alta en la oferta de grados de la sede antes de poder asignar.
+          </span>
+        </p>
+      }
+
+      <div class="formulario__par">
+        <label class="campo">
+          <span class="campo__rotulo">Grado <span class="campo__obligatorio">*</span></span>
+          <select
+            class="campo__control"
+            [value]="grado() ?? ''"
+            [disabled]="sede() === null"
+            (change)="elegirGrado($any($event.target).value)"
+          >
+            <option value="" [selected]="grado() === null">Elige un grado</option>
+            @for (g of grados(); track g) {
+              <option [selected]="grado() === g" [value]="g">{{ g }}°</option>
+            }
+          </select>
+          <span class="campo__ayuda">Solo los grados que esta sede tiene abiertos.</span>
+          @if (errorDe('grado'); as mensaje) {
+            <span class="campo__error">{{ mensaje }}</span>
+          }
+        </label>
+
+        <label class="campo">
+          <span class="campo__rotulo">Grupo <span class="campo__obligatorio">*</span></span>
+          <select
+            class="campo__control"
+            [value]="grupo() ?? ''"
+            [disabled]="grado() === null"
+            (change)="elegirGrupo($any($event.target).value)"
+          >
+            <option value="" [selected]="grupo() === null">Elige un grupo</option>
+            @for (gr of grupos(); track gr) {
+              <option [selected]="grupo() === gr" [value]="gr">{{ gr }}</option>
+            }
+          </select>
+          <span class="campo__ayuda">Un grado con varios grupos necesita una asignación por grupo.</span>
+          @if (errorDe('grupo'); as mensaje) {
+            <span class="campo__error">{{ mensaje }}</span>
+          }
+        </label>
+      </div>
+
+      <label class="campo">
+        <span class="campo__rotulo">Asignatura <span class="campo__obligatorio">*</span></span>
+        <select
+          class="campo__control"
+          [value]="asignaturaId() ?? ''"
+          [disabled]="grado() === null"
+          (change)="elegirAsignatura($any($event.target).value)"
+        >
+          <option value="" [selected]="asignaturaId() === null">Elige una asignatura</option>
+          @for (asignatura of asignaturas(); track asignatura.id) {
+            <option [selected]="asignaturaId() === asignatura.id" [value]="asignatura.id">{{ asignatura.nombre }}</option>
+          }
+        </select>
+        <span class="campo__ayuda">Solo las materias que la malla curricular le da a ese grado.</span>
+        @if (gradoSinMalla()) {
+          <span class="campo__error">
+            La malla curricular todavía no tiene materias cargadas para este grado.
+            Hay que cargarla antes de poder asignar acá.
+          </span>
+        }
+        @if (errorDe('asignatura_id'); as mensaje) {
+          <span class="campo__error">{{ mensaje }}</span>
+        }
+      </label>
+
+      <label class="campo campo--corto">
+        <span class="campo__rotulo">Año <span class="campo__obligatorio">*</span></span>
+        <select
+          class="campo__control"
+          [value]="anio() ?? ''"
+          (change)="elegirAnio($any($event.target).value)"
+        >
+          <option value="" [selected]="anio() === null">Elige un año</option>
+          @for (a of anios(); track a) {
+            <option [selected]="anio() === a" [value]="a">{{ a }}</option>
+          }
+        </select>
+        <!-- No hay campo de período, y conviene decir por qué: es la
+             pregunta que se hace todo el mundo al ver este formulario. -->
+        <span class="campo__ayuda">
+          La asignación cubre los cuatro períodos del año. No se elige período acá.
+        </span>
+        @if (errorDe('anio'); as mensaje) {
+          <span class="campo__error">{{ mensaje }}</span>
+        }
+      </label>
+
+      <!-- Antes del pie, no adentro del botón deshabilitado: el aviso tiene
+           que explicar POR QUÉ no se puede guardar, no solo impedirlo. -->
+      @if (sinConexion()) {
+        <p class="aviso aviso--bloqueo" role="status">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>
+            Sin conexión. Este formulario no guarda en el equipo: cuando vuelva la
+            señal, se puede guardar de una vez sin perder lo que ya está escrito.
+          </span>
+        </p>
+      }
+
+      @if (errorGeneral(); as mensaje) {
+        <p class="aviso aviso--error" role="alert">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>{{ mensaje }}</span>
+        </p>
+      }
+
+      <footer class="modal__pie">
+        <button type="button" class="boton boton--fantasma" (click)="cerrar.emit()">
+          Cancelar
+        </button>
+
+        <!-- Solo al crear: armar el año escolar son diez o quince
+             asignaciones seguidas, y cerrar el modal entre cada una es
+             diez o quince clics de más. -->
+        @if (!esEdicion()) {
+          <button
+            type="button"
+            class="boton boton--secundario"
+            [disabled]="!puedeGuardar()"
+            (click)="enviar(true)"
+          >
+            Guardar y crear otra
+          </button>
+        }
+
+        <button type="submit" class="boton boton--primario" [disabled]="!puedeGuardar()">
+          {{ guardando() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </footer>
+    </form>
+  </div>
+</div>

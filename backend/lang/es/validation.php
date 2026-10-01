@@ -73,11 +73,22 @@ return [
         'valor' => 'nota',
         'estudiante_id' => 'estudiante',
         'asignacion_id' => 'asignación',
+        'periodo_id' => 'período',
         'documento' => 'documento',
         'nombres' => 'nombres',
         'apellidos' => 'apellidos',
         'rol_id' => 'rol',
         'sede_id' => 'sede',
+
+        // Módulo de Asignaciones. 'anio' se muestra como "año" (la
+        // columna no lleva tilde para no depender del encoding de la
+        // base, pero la persona lee español, no nombres de columna).
+        'profesor_id' => 'profesor',
+        'asignatura_id' => 'asignatura',
+        'grado' => 'grado',
+        'grupo' => 'grupo',
+        'anio' => 'año',
+        'activo' => 'estado',
     ],
 
 ];

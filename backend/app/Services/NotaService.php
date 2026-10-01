@@ -3,9 +3,9 @@
 namespace App\Services;
 
 use App\Exceptions\ErrorDeNegocio;
-use App\Models\Asignacion;
 use App\Models\ExcepcionPlazo;
 use App\Models\Nota;
+use App\Models\PeriodoAcademico;
 use App\Models\Usuario;
 
 /**
@@ -27,7 +27,7 @@ class NotaService
     public function registrar(Usuario $usuario, array $datos): Nota
     {
         if ($usuario->rol->nombre === 'profesor') {
-            $this->verificarPlazoParaProfesor($usuario, $datos['asignacion_id']);
+            $this->verificarPlazoParaProfesor($usuario, $datos['asignacion_id'], $datos['periodo_id']);
         }
 
         // La verificación de "¿esta asignación es del profesor?" y "¿el
@@ -37,23 +37,39 @@ class NotaService
         return Nota::create([
             'estudiante_id' => $datos['estudiante_id'],
             'asignacion_id' => $datos['asignacion_id'],
+            'periodo_id' => $datos['periodo_id'],
             'valor' => $datos['valor'],
             'registrado_por' => $usuario->id,
         ]);
     }
 
-    private function verificarPlazoParaProfesor(Usuario $usuario, string $asignacionId): void
+    /**
+     * El plazo se evalúa contra el PERÍODO que se está calificando, no
+     * contra la asignación -- desde 09-asignaciones-por-anio.sql, una
+     * asignación cubre los 4 períodos del año a la vez, así que ya no
+     * identifica un solo período de dónde sacar `estaDentroDePlazo()`.
+     * Antes de esa migración esto se resolvía vía `$asignacion->periodo`;
+     * ese atajo dejó de existir junto con `asignaciones.periodo_id`.
+     *
+     * La excepción de plazo, igual: tiene que ser para ESTE período
+     * puntual (`ex.periodo_id = periodoId`), no para cualquiera de los 4
+     * de la asignación -- mismo criterio que la política RLS
+     * `notas_profesor_inserta_dentro_de_plazo`, que se reescribió con la
+     * misma condición en la misma migración.
+     */
+    private function verificarPlazoParaProfesor(Usuario $usuario, string $asignacionId, int $periodoId): void
     {
-        $asignacion = Asignacion::with('periodo')->findOrFail($asignacionId);
+        $periodo = PeriodoAcademico::findOrFail($periodoId);
 
-        if ($asignacion->periodo->estaDentroDePlazo()) {
+        if ($periodo->estaDentroDePlazo()) {
             return;
         }
 
         $profesorId = $usuario->profesor?->id;
 
-        $tieneExcepcionVigente = ExcepcionPlazo::where('asignacion_id', $asignacion->id)
+        $tieneExcepcionVigente = ExcepcionPlazo::where('asignacion_id', $asignacionId)
             ->where('profesor_id', $profesorId)
+            ->where('periodo_id', $periodoId)
             ->get()
             ->contains(fn (ExcepcionPlazo $excepcion) => $excepcion->estaVigente());
 

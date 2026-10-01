@@ -22,6 +22,10 @@ class NotaResource extends JsonResource
             'id' => $this->id,
             'estudianteId' => $this->estudiante_id,
             'asignacionId' => $this->asignacion_id,
+            // Propio de la nota desde 09-asignaciones-por-anio.sql -- antes
+            // se inferia de la asignación, que ahora cubre los 4 períodos
+            // del año y ya no identifica uno solo.
+            'periodoId' => $this->periodo_id,
             'valor' => (float) $this->valor,
             'enRevision' => $this->en_revision,
             'registradoPor' => $this->registrado_por,

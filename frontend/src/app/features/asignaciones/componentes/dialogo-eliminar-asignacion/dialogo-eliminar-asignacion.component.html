@@ -1,0 +1,182 @@
+<!--
+  El velo cierra al clic; Escape, el foco al abrir, la trampa de Tab y la
+  devolución del foco al cerrar los pone `appModal`. No hay animación de
+  entrada: es vocabulario de landing page y acá solo agrega espera a
+  alguien que ya decidió qué quiere hacer.
+-->
+<div class="modal" role="presentation" (click)="cerrar.emit()">
+  <div
+    class="modal__panel modal__panel--angosto"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="titulo-eliminar"
+    appModal
+    (cerrarModal)="cerrar.emit()"
+    (click)="$event.stopPropagation()"
+  >
+    <header class="modal__cabecera">
+      <h2 class="modal__titulo" id="titulo-eliminar">
+        @if (estaInactiva()) {
+          Esta asignación está desactivada
+        } @else if (tieneNotas()) {
+          Esta asignación no se puede eliminar
+        } @else {
+          ¿Eliminar esta asignación?
+        }
+      </h2>
+
+      <button type="button" class="modal__cerrar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <app-icono nombre="equis" [tamano]="20" />
+      </button>
+    </header>
+
+    <div class="modal__cuerpo">
+      <!-- La ficha de qué se está por tocar: nunca pedir una confirmación
+           sin mostrar sobre qué. -->
+      <dl class="ficha-dato">
+        <div>
+          <dt>Profesor</dt>
+          <dd>{{ asignacion().profesor.nombreCompleto }}</dd>
+        </div>
+        <div>
+          <dt>Asignatura</dt>
+          <dd>{{ asignacion().asignatura.nombre }}</dd>
+        </div>
+        <div>
+          <dt>Grado y grupo</dt>
+          <dd class="ficha-dato__numerico">{{ gradoGrupo() }}</dd>
+        </div>
+        <div>
+          <dt>Sede</dt>
+          <dd>
+            <app-icono nombre="estrella" [tamano]="14" [relleno]="asignacion().sede.esPrincipal" />
+            {{ asignacion().sede.nombre }}
+          </dd>
+        </div>
+        <div>
+          <dt>Año</dt>
+          <dd class="ficha-dato__numerico">{{ asignacion().anio }}</dd>
+        </div>
+      </dl>
+
+      @if (estaInactiva()) {
+        <p class="aviso">
+          <app-icono nombre="apagar" [tamano]="16" />
+          <span>
+            {{ nombreCorto() }} ya no la tiene como vigente: no puede registrar
+            notas nuevas acá.
+            @if (tieneNotas()) {
+              Las <strong>{{ textoNotas() }}</strong> que ya tenía siguen contando
+              en boletines e historial.
+            }
+          </span>
+        </p>
+
+        <div class="alternativa">
+          <h3 class="alternativa__titulo">Volver a ponerla en circulación</h3>
+          <ul class="alternativa__lista">
+            <li>
+              <app-icono nombre="visto" [tamano]="15" />
+              {{ nombreCorto() }} vuelve a poder registrar notas en esta asignatura.
+            </li>
+            <li>
+              <app-icono nombre="visto" [tamano]="15" />
+              No cambia nada de lo que ya estaba registrado.
+            </li>
+          </ul>
+        </div>
+      } @else if (tieneNotas()) {
+        <p class="aviso aviso--bloqueo">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>
+            Ya tiene <strong>{{ textoNotas() }}</strong> de estudiantes de
+            {{ gradoGrupo() }}. Si se borrara, esas notas quedarían sin asignación y se
+            romperían el historial y los boletines.
+          </span>
+        </p>
+
+        <!-- La salida real. No es un premio de consolación: para el caso
+             que de verdad ocurre (el profesor dejó de dictar la materia a
+             mitad de año) desactivar ES lo correcto, no un sustituto. -->
+        <div class="alternativa">
+          <h3 class="alternativa__titulo">Lo que sí se puede hacer: desactivarla</h3>
+          <ul class="alternativa__lista">
+            <li>
+              <app-icono nombre="visto" [tamano]="15" />
+              Las notas se conservan y siguen contando en boletines e historial.
+            </li>
+            <li>
+              <app-icono nombre="visto" [tamano]="15" />
+              {{ nombreCorto() }} deja de tener esta asignación como vigente.
+            </li>
+            <li>
+              <app-icono nombre="visto" [tamano]="15" />
+              Se puede reactivar cuando haga falta, desde esta misma tabla.
+            </li>
+          </ul>
+        </div>
+      } @else {
+        <p class="aviso">
+          No tiene notas registradas, así que se puede eliminar sin afectar ningún
+          boletín. <strong>Esta acción no se puede deshacer.</strong>
+        </p>
+      }
+
+      @if (error(); as mensaje) {
+        <p class="aviso aviso--error" role="alert">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>{{ mensaje }}</span>
+        </p>
+      }
+    </div>
+
+    <footer class="modal__pie">
+      <button type="button" class="boton boton--fantasma" (click)="cerrar.emit()">
+        Cancelar
+      </button>
+
+      @if (estaInactiva()) {
+        <!-- Si además no tiene notas, se puede borrar de verdad: se
+             ofrecen las dos, con el borrado en segundo plano porque es
+             el irreversible. -->
+        @if (!tieneNotas()) {
+          <button
+            type="button"
+            class="boton boton--fantasma boton--fantasma-peligro"
+            [disabled]="guardando()"
+            (click)="eliminar.emit()"
+          >
+            Eliminar
+          </button>
+        }
+
+        <button
+          type="button"
+          class="boton boton--restaurar"
+          [disabled]="guardando()"
+          (click)="reactivar.emit()"
+        >
+          {{ guardando() ? 'Reactivando…' : 'Reactivar asignación' }}
+        </button>
+      } @else if (tieneNotas()) {
+        <button
+          type="button"
+          class="boton boton--primario"
+          [disabled]="guardando()"
+          (click)="desactivar.emit()"
+        >
+          {{ guardando() ? 'Desactivando…' : 'Desactivar asignación' }}
+        </button>
+      } @else {
+        <button
+          type="button"
+          class="boton boton--peligro"
+          [disabled]="guardando()"
+          (click)="eliminar.emit()"
+        >
+          {{ guardando() ? 'Eliminando…' : 'Eliminar asignación' }}
+        </button>
+      }
+    </footer>
+  </div>
+</div>

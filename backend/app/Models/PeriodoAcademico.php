@@ -27,10 +27,13 @@ class PeriodoAcademico extends Model
         ];
     }
 
-    public function asignaciones(): HasMany
-    {
-        return $this->hasMany(Asignacion::class, 'periodo_id');
-    }
+    // No hay asignaciones(): HasMany acá -- desde
+    // 09-asignaciones-por-anio.sql, `asignaciones` ya no tiene
+    // `periodo_id` (tiene `anio`), así que "las asignaciones de este
+    // período" dejó de ser una relación 1:N bien definida -- las mismas
+    // asignaciones son compartidas por los 4 períodos de su año. Ver
+    // Asignacion::matriculasCorrespondientes() para el cruce real
+    // (por `anio`, no por `periodo_id`).
 
     public function matriculas(): HasMany
     {

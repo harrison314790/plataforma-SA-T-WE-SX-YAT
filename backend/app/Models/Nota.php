@@ -30,7 +30,14 @@ class Nota extends Model
     // hace falta que Eloquent también intente gestionarlos.
     public $timestamps = false;
 
-    protected $fillable = ['estudiante_id', 'asignacion_id', 'valor', 'en_revision', 'registrado_por'];
+    // periodo_id es propio de la nota desde 09-asignaciones-por-anio.sql
+    // -- antes se heredaba indirectamente de asignaciones.periodo_id, que
+    // ya no existe porque una asignación ahora cubre los 4 períodos del
+    // año. Esto NO cambia el modelo de calificación: sigue habiendo 4
+    // notas al año por estudiante+asignación (una por período), sin
+    // promediarse a nivel de dato -- ver vista_boletin_anual para el
+    // promedio, que se calcula al vuelo, no se guarda acá.
+    protected $fillable = ['estudiante_id', 'asignacion_id', 'periodo_id', 'valor', 'en_revision', 'registrado_por'];
 
     protected function casts(): array
     {
@@ -50,6 +57,11 @@ class Nota extends Model
     public function asignacion(): BelongsTo
     {
         return $this->belongsTo(Asignacion::class, 'asignacion_id');
+    }
+
+    public function periodo(): BelongsTo
+    {
+        return $this->belongsTo(PeriodoAcademico::class, 'periodo_id');
     }
 
     public function registradoPor(): BelongsTo

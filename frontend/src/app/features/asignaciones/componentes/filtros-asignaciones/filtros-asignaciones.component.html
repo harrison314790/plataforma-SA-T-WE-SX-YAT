@@ -1,0 +1,138 @@
+<!--
+  BARRA de filtros, no tarjeta de filtros.
+
+  Qué cambió y por qué: antes esto era un bloque con encabezado propio y
+  una grilla de seis campos con rótulo arriba de cada uno -- unos 200px
+  de alto, que en un portátil de 768px se comía un cuarto de la pantalla
+  antes de mostrar una sola fila de datos. En un ERP denso la tabla es el
+  contenido; el filtro es una herramienta, y una herramienta no puede
+  ocupar más que aquello sobre lo que actúa.
+
+  Ahora es una sola fila de ~44px. Lo que lo hace posible es que los
+  `<select>` YA se describen solos: dicen "Todas las sedes", "Todos los
+  grados". El rótulo de arriba repetía esa palabra una segunda vez. Se
+  quita de la vista y se conserva en `aria-label`, así que para un lector
+  de pantalla no se perdió nada -- lo que se fue es la duplicación
+  visual, no la información.
+-->
+<!--
+  `[selected]` en cada opción ADEMÁS del `[value]` del select, y no es
+  redundancia: es el arreglo de un bug real.
+
+  Al entrar con filtros en la URL (?grado=11), el `[value]` del select se
+  aplica en el primer render -- cuando el `@for` todavía no pintó ninguna
+  opción, porque los catálogos llegan por HTTP. El navegador descarta un
+  value que no corresponde a ninguna opción y deja el select en "". Las
+  opciones llegan medio segundo después, pero el binding no se vuelve a
+  evaluar (el valor no cambió), así que el control queda mostrando "Todos
+  los grados" mientras la tabla SÍ está filtrada. Es exactamente el
+  "la tabla está vacía y no entiendo por qué" que el botón Limpiar existe
+  para evitar.
+
+  `[selected]` se evalúa por opción, a medida que cada una se crea, así
+  que la correcta queda marcada aunque llegue tarde.
+-->
+<section class="barra-filtros" role="search" aria-label="Filtros de asignaciones">
+  <div class="barra-filtros__campos">
+    <select
+      class="filtro"
+      aria-label="Filtrar por año"
+      [value]="filtros().anio ?? ''"
+      (change)="cambiar('anio', comoNumero($any($event.target).value))"
+    >
+      <option value="" [selected]="filtros().anio === null">Todos los años</option>
+      @for (anio of anios(); track anio) {
+        <option [selected]="filtros().anio === anio" [value]="anio">{{ anio }}</option>
+      }
+    </select>
+
+    <select
+      class="filtro"
+      aria-label="Filtrar por sede"
+      [value]="filtros().sedeId ?? ''"
+      (change)="cambiar('sedeId', comoNumero($any($event.target).value))"
+    >
+      <option value="" [selected]="filtros().sedeId === null">Todas las sedes</option>
+      @for (sede of sedes(); track sede.id) {
+        <option [selected]="filtros().sedeId === sede.id" [value]="sede.id">{{ sede.nombre }}</option>
+      }
+    </select>
+
+    <!--
+      Grado y Grupo son DOS filtros, no uno. Elegir "3°" y dejar el grupo
+      en "Todos" devuelve 3-A, 3-B y lo que haya: es la pregunta que hace
+      coordinación al armar el año.
+    -->
+    <select
+      class="filtro filtro--corto"
+      aria-label="Filtrar por grado"
+      [value]="filtros().grado ?? ''"
+      (change)="cambiar('grado', comoNumero($any($event.target).value))"
+    >
+      <option value="" [selected]="filtros().grado === null">Todos los grados</option>
+      @for (grado of grados(); track grado) {
+        <option [selected]="filtros().grado === grado" [value]="grado">{{ grado }}°</option>
+      }
+    </select>
+
+    <select
+      class="filtro filtro--corto"
+      aria-label="Filtrar por grupo"
+      [value]="filtros().grupo ?? ''"
+      (change)="cambiar('grupo', comoTexto($any($event.target).value))"
+    >
+      <option value="" [selected]="filtros().grupo === null">Todos los grupos</option>
+      @for (grupo of grupos(); track grupo) {
+        <option [selected]="filtros().grupo === grupo" [value]="grupo">Grupo {{ grupo }}</option>
+      }
+    </select>
+
+    <select
+      class="filtro"
+      aria-label="Filtrar por profesor"
+      [value]="filtros().profesorId ?? ''"
+      (change)="cambiar('profesorId', comoTexto($any($event.target).value))"
+    >
+      <option value="" [selected]="filtros().profesorId === null">Todos los profesores</option>
+      @for (profesor of profesores(); track profesor.id) {
+        <option [selected]="filtros().profesorId === profesor.id" [value]="profesor.id">{{ profesor.nombreCompleto }}</option>
+      }
+    </select>
+
+    <select
+      class="filtro"
+      aria-label="Filtrar por asignatura"
+      [value]="filtros().asignaturaId ?? ''"
+      (change)="cambiar('asignaturaId', comoNumero($any($event.target).value))"
+    >
+      <option value="" [selected]="filtros().asignaturaId === null">Todas las asignaturas</option>
+      @for (asignatura of asignaturas(); track asignatura.id) {
+        <option [selected]="filtros().asignaturaId === asignatura.id" [value]="asignatura.id">{{ asignatura.nombre }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="barra-filtros__fin">
+    @if (resultados() !== null) {
+      <span class="barra-filtros__conteo" aria-live="polite">
+        {{ resultados() }} {{ resultados() === 1 ? 'asignación' : 'asignaciones' }}
+      </span>
+    }
+
+    <!--
+      SIEMPRE presente, deshabilitado cuando no hay nada que limpiar.
+      Antes aparecía y desaparecía según hubiera filtros, y ese es
+      justamente el momento en que se lo busca: con la tabla vacía, un
+      botón que no está no se puede encontrar. Un botón apagado en un
+      lugar fijo se aprende una vez; uno que se mueve, nunca.
+    -->
+    <button
+      type="button"
+      class="boton boton--secundario boton--compacto"
+      [disabled]="!hayFiltros()"
+      (click)="limpiar.emit()"
+    >
+      Limpiar{{ hayFiltros() ? ' (' + activos() + ')' : '' }}
+    </button>
+  </div>
+</section>

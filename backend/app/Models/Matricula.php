@@ -18,7 +18,7 @@ class Matricula extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['estudiante_id', 'sede_id', 'grado', 'periodo_id', 'estado'];
+    protected $fillable = ['estudiante_id', 'sede_id', 'grado', 'grupo', 'periodo_id', 'estado'];
 
     public function estudiante(): BelongsTo
     {

@@ -1,0 +1,1089 @@
+/*
+  ═══════════════════════════════════════════════════════════
+  MÓDULO DE ASIGNACIONES (features/asignaciones)
+
+  Tercera hoja de estilos del proyecto, después de `styles.css` (tokens y
+  componentes de estado) y `estilos/marco.css` (el marco de la app). Se
+  carga en ese orden desde `angular.json`.
+
+  Todo sale de los tokens de styles.css -- ni un hex ni un padding suelto
+  en este archivo. Las piezas genéricas que nacen acá (.boton, .campo,
+  .tabla, .modal, .aviso) están escritas para poder MUDARSE a styles.css
+  tal cual el día que un segundo módulo las necesite: nombres neutros, sin
+  el prefijo del módulo. Lo específico de esta pantalla sí lo lleva
+  (.asignaciones__*, .filtros__*).
+
+  Contrastes verificados, no asumidos (todos sobre --superficie #FFFFFF
+  salvo donde se aclara):
+  · --accion-700 #0E817E relleno + blanco        -> 4.8:1  AA
+  · --reprobado-700 #B23434 relleno + blanco     -> 6.1:1  AA
+  · --reprobado-900 #8C1F1F texto                -> 8.9:1  AAA
+  · --accion-900 #0A5C5A texto                   -> 8.0:1  AAA
+  · --texto-secundario #5C5C5C texto             -> 7.0:1  AAA
+  · --pendiente-texto #7A7400 sobre #FAF8C6      -> 5.4:1  AA
+
+  El verde de --aprobado-* NO aparece en este archivo, a propósito: en
+  este sistema el verde significa "nota aprobada". Usarlo para confirmar
+  que se guardó algo le quitaría ese significado en la tabla de notas, que
+  es donde de verdad importa. La confirmación va en turquesa, que es el
+  color de interacción.
+  ═══════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────────
+   LA PÁGINA
+   ─────────────────────────────────────────────────────────── */
+
+.asignaciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-6);
+  max-width: 1280px;
+  padding: var(--espacio-8) var(--espacio-6);
+}
+
+.asignaciones__cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-4);
+  flex-wrap: wrap;
+}
+
+/* Título y aclaración en la MISMA línea. El párrafo de tres renglones
+   que había antes explicaba el módulo a quien ya sabe para qué entró:
+   se lee una vez y después estorba todos los días. Lo que de verdad
+   había que decir ("vale para el año completo") se movió al formulario,
+   que es donde se decide. */
+.asignaciones__titulo {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espacio-3);
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.asignaciones__ayuda {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--texto-secundario);
+}
+
+.asignaciones__acciones {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  flex-wrap: wrap;
+  /* `margin-left: auto` y no confiar en `justify-content: space-between`
+     del padre: cuando el título y su aclaración llenan la línea, los
+     botones bajan a la siguiente -- y ahí `space-between` los deja
+     pegados a la IZQUIERDA, que es donde nadie los busca. Con el margen
+     automático quedan a la derecha en cualquiera de las dos líneas. */
+  margin-left: auto;
+}
+
+/* ───────────────────────────────────────────────────────────
+   BARRA DE FILTROS
+
+   Una fila de ~44px, no un bloque de ~200px. En un ERP denso la tabla
+   es el contenido y el filtro es una herramienta: una herramienta no
+   puede ocupar más pantalla que aquello sobre lo que actúa. En un
+   portátil de 768px, la versión anterior (tarjeta con encabezado y seis
+   campos rotulados en grilla) se comía un cuarto del alto antes de
+   mostrar una sola fila de datos.
+
+   Los rótulos visibles se fueron porque los `<select>` ya se describen
+   solos ("Todas las sedes", "Todos los grados"): el rótulo repetía esa
+   palabra una segunda vez. La información sigue ahí para lectores de
+   pantalla, en `aria-label` -- lo que se quitó es la duplicación, no el
+   dato.
+
+   `flex-wrap` y no una grilla: acá los campos NO deben medir todos lo
+   mismo (el de profesor necesita más que el de grado), y al angostarse
+   tienen que reacomodarse en dos filas, no encogerse hasta ser
+   ilegibles.
+   ─────────────────────────────────────────────────────────── */
+
+.barra-filtros {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  flex-wrap: wrap;
+  padding: var(--espacio-2) var(--espacio-3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+  background: var(--fondo-solo-lectura);
+}
+
+/* `display: contents` y no un flex anidado: el contenedor desaparece del
+   layout y sus seis selects pasan a ser hijos directos de la barra.
+   Importa porque con un flex adentro de otro, el grupo entero se
+   comporta como UN item -- los selects llenaban la primera línea y
+   empujaban el conteo y "Limpiar" a una segunda, dejando la derecha de
+   la primera vacía (93px de alto con un hueco en el medio). Así todo
+   fluye en la misma secuencia y las líneas se llenan parejo. */
+.barra-filtros__campos {
+  display: contents;
+}
+
+.barra-filtros__fin {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+  margin-left: auto;
+}
+
+.barra-filtros__conteo {
+  font-size: 13px;
+  color: var(--texto-secundario);
+  white-space: nowrap;
+}
+
+/* El control de filtro: más bajo que un campo de formulario (32 contra
+   36) porque acá no se escribe, se elige. Fondo blanco sobre el gris de
+   la barra, para que se lean como controles y no como texto. */
+.filtro {
+  height: 32px;
+  max-width: 200px;
+  padding: 0 var(--espacio-2);
+  font-family: var(--fuente-ui);
+  font-size: 13px;
+  color: var(--texto-principal);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.filtro:hover {
+  border-color: var(--accion-300);
+}
+
+.filtro:focus-visible {
+  border-color: var(--accion-700);
+}
+
+.filtro--corto {
+  max-width: 150px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   CAMPOS DE FORMULARIO (genérico, candidato a styles.css)
+   ─────────────────────────────────────────────────────────── */
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+  min-width: 0;
+}
+
+.campo__rotulo {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--texto-principal);
+}
+
+.campo__obligatorio {
+  color: var(--reprobado-700);
+}
+
+.campo__control {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--espacio-3);
+  font-family: var(--fuente-ui);
+  font-size: 14px;
+  color: var(--texto-principal);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+  transition: border-color 120ms ease;
+}
+
+.campo__control:hover:not(:disabled) {
+  border-color: var(--accion-300);
+}
+
+.campo__control:focus-visible {
+  border-color: var(--accion-700);
+}
+
+.campo__control:disabled {
+  background: var(--fondo-solo-lectura);
+  color: var(--texto-secundario);
+  cursor: not-allowed;
+}
+
+/* Un código que se teclea, no prosa: mono y con separación de letras
+   para que se lea carácter por carácter mientras se escribe. */
+.campo__control--codigo {
+  font-family: var(--fuente-datos);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.campo__ayuda {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--texto-secundario);
+}
+
+.campo__error {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--reprobado-900);
+}
+
+/* El campo que no se edita: la sede, que sale del profesor. Se ve como
+   dato y no como input desactivado -- un `<select>` gris invita a
+   intentar abrirlo, y esto no es un campo bloqueado, es una consecuencia. */
+.campo--derivado .campo__valor {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  min-height: 36px;
+  padding: 0 var(--espacio-3);
+  font-size: 14px;
+  background: var(--fondo-solo-lectura);
+  border: 1px dashed var(--borde);
+  border-radius: var(--radius);
+}
+
+.campo__valor-detalle {
+  color: var(--texto-secundario);
+}
+
+.campo__valor-vacio {
+  color: var(--texto-secundario);
+  font-style: italic;
+}
+
+.campo--corto {
+  max-width: 220px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   BOTONES (genérico, candidato a styles.css)
+   ─────────────────────────────────────────────────────────── */
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espacio-2);
+  height: 36px;
+  padding: 0 var(--espacio-4);
+  font-family: var(--fuente-ui);
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.boton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.boton--primario {
+  background: var(--accion-700);
+  color: var(--superficie);
+}
+
+.boton--primario:hover:not(:disabled) {
+  background: var(--accion-900);
+}
+
+.boton--secundario {
+  background: var(--superficie);
+  border-color: var(--accion-700);
+  color: var(--accion-700);
+}
+
+.boton--secundario:hover:not(:disabled) {
+  background: var(--accion-050);
+}
+
+.boton--fantasma {
+  background: transparent;
+  color: var(--texto-secundario);
+}
+
+.boton--fantasma:hover:not(:disabled) {
+  background: var(--fondo-solo-lectura);
+  color: var(--texto-principal);
+}
+
+/* Reactivar, como acción principal del diálogo. Mismo verde que el
+   enlace del modal de grados y grupos, y por la misma razón: es lo
+   único del módulo que DEVUELVE algo a circulación. Ver la nota larga
+   sobre esta excepción en `.boton--enlace-restaurar`.
+   Contraste: blanco sobre #008000 -> 5.1:1, AA. */
+.boton--restaurar {
+  background: var(--aprobado-900);
+  color: var(--superficie);
+}
+
+.boton--restaurar:hover:not(:disabled) {
+  background: var(--aprobado-700);
+}
+
+/* Borrado en segundo plano: cuando comparte pie con Reactivar, el
+   irreversible NO puede tener el mismo peso que el reversible. */
+.boton--fantasma-peligro {
+  color: var(--reprobado-900);
+}
+
+.boton--fantasma-peligro:hover:not(:disabled) {
+  background: var(--reprobado-050);
+  color: var(--reprobado-900);
+}
+
+.boton--peligro {
+  background: var(--reprobado-700);
+  color: var(--superficie);
+}
+
+.boton--peligro:hover:not(:disabled) {
+  background: var(--reprobado-900);
+}
+
+/* Para la barra de filtros: mismo botón, altura de control de barra. */
+.boton--compacto {
+  height: 32px;
+  padding: 0 var(--espacio-3);
+  font-size: 13px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   ACCIONES DE FILA
+
+   Ícono + texto, no una cosa o la otra. Solo ícono obliga a aprender
+   tres pictogramas antes de poder usar la tabla, y un lápiz y una
+   papelera a 16px se confunden de reojo; solo texto deja una hilera de
+   palabras subrayadas que hay que leer entera para encontrar la que se
+   busca. Juntos, el ícono ancla la posición y el texto la confirma --
+   que es como se recorre una tabla densa todos los días.
+
+   El texto se esconde por debajo de 1100px (ver el bloque móvil), y
+   por eso cada botón lleva `title`: el nombre no se pierde nunca.
+
+   Sin caja ni borde: tres rectángulos por fila, en una tabla de 40
+   filas, son 120 cajas compitiendo con el dato.
+   ─────────────────────────────────────────────────────────── */
+
+.accion {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espacio-1);
+  padding: var(--espacio-1) var(--espacio-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  font-family: var(--fuente-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accion-700);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.accion:hover:not(:disabled) {
+  background: var(--accion-050);
+  color: var(--accion-900);
+}
+
+.accion:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.accion--peligro {
+  color: var(--reprobado-900);
+}
+
+.accion--peligro:hover:not(:disabled) {
+  background: var(--reprobado-050);
+  color: var(--reprobado-900);
+}
+
+/* Acción dentro de una fila de tabla: sin caja, para no meter seis
+   rectángulos por fila en una tabla densa. */
+.boton--enlace {
+  height: auto;
+  padding: 2px 0;
+  background: none;
+  color: var(--accion-700);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.boton--enlace:hover:not(:disabled) {
+  color: var(--accion-900);
+}
+
+/* Reactivar, en el modal de grados y grupos. Verde, y es la ÚNICA
+   excepción del módulo a la regla de que el verde significa "nota
+   aprobada".
+
+   Se justifica por dos razones concretas: ni esta lista ni la tabla de
+   atrás muestran una sola nota (valores ni estados de calificación), así
+   que no hay con qué confundirlo; y es la única acción de la lista que
+   DEVUELVE algo a circulación -- sus dos vecinas, Desactivar y Eliminar,
+   lo sacan o lo destruyen. Aparece además sobre una fila atenuada, donde
+   el turquesa de las otras se pierde contra el gris.
+
+   Si esta pantalla llegara a mostrar notas algún día, esto vuelve a
+   turquesa: el verde de "aprobada" vale más que el matiz de acá.
+   Contraste: #008000 sobre blanco -> 5.1:1, AA. */
+.boton--enlace-restaurar {
+  color: var(--aprobado-900);
+}
+
+.boton--enlace-restaurar:hover:not(:disabled) {
+  color: var(--aprobado-700);
+}
+
+.boton--enlace-peligro {
+  color: var(--reprobado-900);
+}
+
+.boton--enlace-peligro:hover:not(:disabled) {
+  color: var(--reprobado-700);
+}
+
+/* ───────────────────────────────────────────────────────────
+   TABLA
+
+   Sin zebra striping y sin paginación, según el sistema de diseño:
+   líneas de 1px y resaltado al hover alcanzan, y el rayado alternado
+   pelearía con el color de los estados.
+   ─────────────────────────────────────────────────────────── */
+
+.tabla-contenedor {
+  overflow-x: auto;
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+}
+
+.tabla {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+/* Visible para lector de pantalla, no en la pantalla: la cabecera de la
+   página ya dice qué es esto, repetirlo en grande sería ruido. */
+.tabla__leyenda {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tabla thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--espacio-2) var(--espacio-3);
+  text-align: left;
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texto-secundario);
+  background: var(--fondo-solo-lectura);
+  border-bottom: 1px solid var(--borde);
+}
+
+.tabla tbody td,
+.tabla tbody th {
+  height: var(--fila-media);
+  padding: var(--espacio-2) var(--espacio-3);
+  text-align: left;
+  font-weight: 400;
+  border-bottom: 1px solid var(--borde);
+  /* Celdas sin redondear: el radius en una celda abre huecos visuales
+     entre celdas vecinas y rompe la lectura de la cuadrícula. */
+  border-radius: var(--radius-celda);
+}
+
+.tabla tbody tr:last-child td,
+.tabla tbody tr:last-child th {
+  border-bottom: 0;
+}
+
+.tabla tbody tr:hover td,
+.tabla tbody tr:hover th {
+  background: var(--accion-050);
+}
+
+.tabla__celda-nombre {
+  font-weight: 500;
+}
+
+/* Cifras tabulares: los años y los grados alinean en columna aunque los
+   dígitos tengan anchos distintos. */
+.tabla__celda-numerica {
+  font-family: var(--fuente-datos);
+  font-variant-numeric: tabular-nums;
+}
+
+/* OJO -- error real, visto en pantalla: `display: flex` en un `<td>` lo
+   saca del algoritmo de layout de tabla y la columna deja de alinearse
+   con su encabezado (los bordes de fila se cortan a la mitad). Las
+   celdas se quedan como `table-cell` y lo que se alinea es el contenido,
+   con `inline-flex` por dentro. */
+.tabla__celda-sede {
+  color: var(--texto-secundario);
+  white-space: nowrap;
+}
+
+.tabla__celda-sede app-icono {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: var(--espacio-1);
+}
+
+.tabla__celda-acciones {
+  white-space: nowrap;
+}
+
+.tabla__celda-acciones .accion + .accion {
+  margin-left: var(--espacio-1);
+}
+
+.tabla__col-corta {
+  width: 88px;
+}
+
+.tabla__col-acciones {
+  width: 260px;
+}
+
+/* La fila desactivada se atenúa pero NO se esconde: esconderla dejaría
+   notas colgando de algo invisible. El texto se mantiene legible (el
+   atenuado es del fondo, no del color de texto) y la etiqueta "Inactiva"
+   dice lo mismo que el tono. */
+.tabla__fila--inactiva td,
+.tabla__fila--inactiva th {
+  background: var(--fondo-solo-lectura);
+  color: var(--texto-secundario);
+}
+
+/* ───────────────────────────────────────────────────────────
+   ETIQUETAS DE ESTADO
+
+   Nunca color solo: cada una lleva su texto. Es la regla dura del
+   sistema de diseño, por daltonismo y porque el color ya está cargado de
+   significado en este producto.
+   ─────────────────────────────────────────────────────────── */
+
+.etiqueta {
+  display: inline-block;
+  margin-left: var(--espacio-2);
+  padding: 1px var(--espacio-2);
+  border-radius: var(--radius);
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+
+.etiqueta--inactiva {
+  background: var(--borde);
+  color: var(--texto-secundario);
+}
+
+.etiqueta--aviso {
+  background: var(--pendiente-100);
+  color: var(--pendiente-texto);
+}
+
+/* ───────────────────────────────────────────────────────────
+   AVISOS EN LÍNEA
+   ─────────────────────────────────────────────────────────── */
+
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espacio-2);
+  margin: 0;
+  padding: var(--espacio-3);
+  border-radius: var(--radius);
+  background: var(--fondo-solo-lectura);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--texto-secundario);
+}
+
+.aviso app-icono {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* Turquesa y no verde: ver la nota de contrastes al inicio del archivo. */
+.aviso--ok {
+  background: var(--accion-050);
+  color: var(--accion-900);
+}
+
+.aviso--error {
+  background: var(--reprobado-050);
+  color: var(--reprobado-900);
+}
+
+.aviso--bloqueo {
+  background: var(--reprobado-050);
+  color: var(--reprobado-900);
+  border: 1px solid var(--reprobado-100);
+}
+
+/* ───────────────────────────────────────────────────────────
+   ESTADO VACÍO, CENTRADO
+
+   `styles.css` deja `.estado-vacio` alineado a la izquierda, que es lo
+   correcto cuando se mete en una columna angosta. Acá el hueco que deja
+   una tabla sin resultados es todo el ancho de la pantalla, y un mensaje
+   pegado al borde izquierdo de ese vacío se lee como un error de
+   maquetado, no como una respuesta.
+
+   El override vive acá y no en `styles.css` para no cambiarle el estado
+   vacío a los otros módulos, que todavía no están construidos y pueden
+   necesitar la versión angosta.
+   ─────────────────────────────────────────────────────────── */
+
+.asignaciones .estado-vacio {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--espacio-4);
+  min-height: 220px;
+  padding: var(--espacio-12) var(--espacio-6);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+  /* Punteado y no continuo: el borde señala "acá iría la tabla", no
+     delimita una tarjeta con contenido propio. */
+  border-style: dashed;
+}
+
+.asignaciones .estado-vacio p {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ───────────────────────────────────────────────────────────
+   MODALES
+
+   Sin animación de entrada: es vocabulario de landing page y acá solo
+   agrega espera a alguien que ya decidió qué quiere hacer.
+   ─────────────────────────────────────────────────────────── */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--espacio-6) var(--espacio-4);
+  overflow-y: auto;
+  /* Nada de backdrop-filter: es caro en los Android de gama baja que usa
+     buena parte de la institución. */
+  background: rgba(26, 26, 26, 0.45);
+}
+
+.modal__panel {
+  width: 100%;
+  max-width: 560px;
+  background: var(--superficie);
+  border-radius: var(--radius);
+  box-shadow: var(--sombra-2);
+}
+
+.modal__panel--angosto {
+  max-width: 480px;
+}
+
+.modal__cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espacio-4);
+  padding: var(--espacio-4);
+  border-bottom: 1px solid var(--borde);
+}
+
+.modal__titulo {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.modal__subtitulo {
+  max-width: 52ch;
+  margin: var(--espacio-2) 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--texto-secundario);
+}
+
+/* La equis de cerrar: 40px y con caja propia.
+
+   Antes era un ícono de 32px flotando sin fondo, del mismo gris que el
+   texto secundario -- se perdía contra el encabezado y había que
+   buscarla. Ahora tiene borde y relleno, así que se lee como un control
+   desde el primer vistazo.
+
+   El color aparece al pasar por encima, no en reposo, y esa distinción
+   es deliberada: en rojo permanente competiría con "Eliminar asignación"
+   del pie, que es la acción que de verdad destruye algo. Acá el rojo
+   dice "esto descarta lo que estás haciendo", que es cierto solo cuando
+   ya se está apuntando al botón. */
+.modal__cerrar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+  background: var(--fondo-solo-lectura);
+  color: var(--texto-secundario);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.modal__cerrar:hover {
+  background: var(--reprobado-050);
+  border-color: var(--reprobado-100);
+  /* #8C1F1F sobre #FDF0F0 -> 8.4:1, AAA de sobra. */
+  color: var(--reprobado-900);
+}
+
+.modal__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding: var(--espacio-4);
+}
+
+/* El pie tiene padding COMPLETO por defecto.
+
+   Antes solo tenía `padding-top`, porque el primer modal que lo usó lo
+   tenía dentro de `.modal__cuerpo`, que ya aporta los 16px de los
+   lados. En el modal de grados y grupos el pie es hermano del cuerpo
+   (no hay `<form>` que lo envuelva), así que se quedaba sin padding
+   lateral ni inferior: el botón "Listo" terminaba pegado al borde
+   del panel, desalineado respecto de los botones de los otros modales.
+   Con el padding acá, el pie se ve igual esté donde esté. */
+.modal__pie {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--espacio-2);
+  flex-wrap: wrap;
+  padding: var(--espacio-4);
+  border-top: 1px solid var(--borde);
+}
+
+/* Y cuando SÍ está adentro del cuerpo, se le quita el que sobra para no
+   sumarlo dos veces. */
+.modal__cuerpo .modal__pie {
+  margin-top: var(--espacio-2);
+  padding-inline: 0;
+  padding-bottom: 0;
+}
+
+.formulario__par {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--espacio-4);
+}
+
+/* ───────────────────────────────────────────────────────────
+   FICHA DE DATOS DEL DIÁLOGO DE BORRADO
+
+   Nunca pedir una confirmación sin mostrar sobre qué.
+   ─────────────────────────────────────────────────────────── */
+
+.ficha-dato {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--espacio-3);
+  margin: 0;
+  padding: var(--espacio-3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+  background: var(--fondo-solo-lectura);
+}
+
+.ficha-dato dt {
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--texto-secundario);
+}
+
+.ficha-dato dd {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-1);
+  margin: var(--espacio-1) 0 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ficha-dato__numerico {
+  font-family: var(--fuente-datos);
+  font-variant-numeric: tabular-nums;
+}
+
+/* La salida cuando eliminar no es posible. No se pinta como error: es lo
+   que sí se puede hacer, y para el caso frecuente es además lo correcto. */
+.alternativa {
+  padding: var(--espacio-3);
+  border: 1px solid var(--accion-100);
+  border-radius: var(--radius);
+  background: var(--accion-050);
+}
+
+.alternativa__titulo {
+  margin: 0 0 var(--espacio-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accion-900);
+}
+
+.alternativa__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.alternativa__lista li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espacio-2);
+}
+
+.alternativa__lista app-icono {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accion-700);
+}
+
+/* ───────────────────────────────────────────────────────────
+   GRADOS Y GRUPOS (modal de oferta_grados)
+   ─────────────────────────────────────────────────────────── */
+
+/* El alta, en una sola fila: es la acción que trae a la gente a este
+   modal. Los dos campos cortos (grado y grupo) no necesitan el ancho de
+   un selector de sede, de ahí el `flex` con anchos desparejos en vez de
+   una grilla pareja. */
+.alta-grado {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--espacio-3);
+  flex-wrap: wrap;
+  padding: var(--espacio-3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+  background: var(--fondo-solo-lectura);
+}
+
+.alta-grado .campo {
+  flex: 1 1 160px;
+}
+
+.alta-grado .campo--estrecho {
+  flex: 0 0 96px;
+}
+
+.grados-sede {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+}
+
+.grados-sede__titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  margin: 0;
+  font-family: var(--fuente-encabezado-tabla);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--texto-secundario);
+}
+
+.grados-lista {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--borde);
+  border-radius: var(--radius);
+}
+
+.grados-lista__fila {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+  padding: var(--espacio-2) var(--espacio-3);
+  font-size: 13px;
+}
+
+.grados-lista__fila + .grados-lista__fila {
+  border-top: 1px solid var(--borde);
+}
+
+/* Atenuada pero legible, igual que la fila inactiva de la tabla: lo que
+   baja es el fondo, no el color del texto. La etiqueta "Inactivo" dice
+   lo mismo que el tono -- nunca color solo. */
+.grados-lista__fila--inactiva {
+  background: var(--fondo-solo-lectura);
+  color: var(--texto-secundario);
+}
+
+/* '9-B' es un dato, no prosa: mono con cifras tabulares, igual que en la
+   tabla y en la regla de período de la barra superior. */
+.grados-lista__codigo {
+  flex: 0 0 64px;
+  font-family: var(--fuente-datos);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.grados-lista__detalle {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--texto-secundario);
+}
+
+.grados-lista__acciones {
+  flex: none;
+  margin-left: auto;
+}
+
+/* Entre 1100px y el corte móvil, la tabla ya no tiene aire para tres
+   rótulos por fila: se queda el ícono y el nombre vive en `title` y en
+   el tooltip del navegador. Por encima de 1100 se muestran los dos,
+   porque el texto es lo que hace que la acción se encuentre sin
+   aprenderse los pictogramas. */
+@media (max-width: 1100px) {
+  .accion__texto {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tabla__col-acciones {
+    width: 150px;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────
+   MÓVIL
+
+   La grilla de filtros cae a una columna sola y la tabla conserva su
+   scroll horizontal propio -- nunca el de la página entera.
+   ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .asignaciones {
+    padding: var(--espacio-6) var(--espacio-4);
+  }
+
+  /* Los filtros pasan a una columna y los controles crecen al alto
+     táctil: en la barra apretada del escritorio, un select de 32px en
+     una pantalla táctil hace tocar el vecino. */
+  /* Vuelve a ser una caja: `display: contents` no admite apilar sus
+     hijos, porque el contenedor ya no existe para el layout. */
+  .barra-filtros__campos {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--espacio-2);
+    width: 100%;
+  }
+
+  .filtro,
+  .filtro--corto {
+    max-width: none;
+    height: 44px;
+  }
+
+  .barra-filtros__fin {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .alta-grado .campo,
+  .alta-grado .campo--estrecho {
+    flex: 1 1 100%;
+  }
+
+  .formulario__par {
+    grid-template-columns: 1fr;
+  }
+
+  .modal {
+    padding: var(--espacio-4) var(--espacio-2);
+  }
+
+  /* Área táctil: 36px es cómodo con puntero, corto con el dedo. El
+     mínimo recomendado es 44px, y en una pantalla de calificaciones
+     tocar el control vecino no es un detalle cosmético. */
+  .campo__control,
+  .boton {
+    height: 44px;
+  }
+
+  .boton--enlace {
+    height: auto;
+    padding: var(--espacio-2) 0;
+  }
+
+  /* No es `.boton`, así que la regla de arriba no la alcanza: se sube
+     aparte al mínimo táctil de 44px. */
+  .modal__cerrar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .accion {
+    padding: var(--espacio-2);
+  }
+}

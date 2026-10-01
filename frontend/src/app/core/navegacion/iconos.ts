@@ -69,6 +69,46 @@ export const ICONOS = {
 
   /** Confirmación. */
   visto: 'M4.8 12.6l4.4 4.4 9.9-10',
+
+  /**
+   * Editar una fila. Lápiz en diagonal, con su punta.
+   *
+   * Los tres que siguen (lapiz, papelera, apagar) no salen del escudo
+   * como el resto del set, y no hay forma de que salgan: son primitivas
+   * de interfaz, no motivos gráficos. La alternativa era dejar las
+   * acciones de la tabla solo como texto, que en una fila de 40px con
+   * tres acciones se vuelve una hilera de palabras subrayadas difícil de
+   * recorrer. Se mantienen en el mismo lenguaje del set -- trazo de
+   * 1.75, extremos redondeados, nada de relleno -- para que no se noten
+   * como piezas de otra familia.
+   */
+  lapiz: 'M4.5 19.5h3.5L18.7 8.8a1.9 1.9 0 000-2.7l-.8-.8a1.9 1.9 0 00-2.7 0L4.5 16z M14.6 6.9l2.5 2.5',
+
+  /** Eliminar definitivamente. Papelera con tapa y dos estrías. */
+  papelera: 'M4.6 7h14.8M9.6 7V4.6h4.8V7M6.9 7l.8 12.4h8.6L17.1 7M10.4 10.4v6M13.6 10.4v6',
+
+  /**
+   * Desactivar: el símbolo universal de encendido/apagado. Dice
+   * "sacar de circulación" sin sugerir que algo se destruye, que es
+   * exactamente la diferencia con la papelera de al lado.
+   */
+  apagar: 'M12 4.4v7.2M7.3 7.1a6.6 6.6 0 109.4 0',
+
+  /**
+   * Cerrar un modal.
+   *
+   * Se agrega porque no había ninguna equis en el set y los modales
+   * estaban usando `salir` -- que es la puerta con la flecha del CERRAR
+   * SESIÓN de la barra superior. Con lector de pantalla no se notaba (el
+   * botón ya dice "Cerrar"), pero a la vista es el mismo dibujo para
+   * "cerrar esta ventana" y para "salir del sistema": el segundo pierde
+   * una hora de trabajo si se pulsa por error.
+   *
+   * No sale del escudo, a diferencia del resto del set, y no hay forma
+   * de que salga: una equis es una primitiva de interfaz, no un motivo
+   * gráfico. Es la excepción y conviene que siga siendo la única.
+   */
+  equis: 'M6.8 6.8l10.4 10.4M17.2 6.8L6.8 17.2',
 } as const;
 
 export type NombreDeIcono = keyof typeof ICONOS;
