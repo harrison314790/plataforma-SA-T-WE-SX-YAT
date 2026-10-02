@@ -63,6 +63,28 @@ export const routes: Routes = [
       },
 
       {
+        path: 'nudos',
+        canActivate: [tienePermisoGuard('vista_nudos_pedagogicos')],
+        title: 'Nudos pedagógicos · Sistema Académico',
+        loadChildren: () => import('./features/nudos/nudos.routes').then((m) => m.NUDOS_ROUTES),
+      },
+
+      {
+        path: 'porcentajes',
+        canActivate: [tienePermisoGuard('vista_porcentajes_grado')],
+        title: 'Porcentajes por grado · Sistema Académico',
+        loadChildren: () =>
+          import('./features/porcentajes/porcentajes.routes').then((m) => m.PORCENTAJES_ROUTES),
+      },
+
+      {
+        path: 'boletines',
+        canActivate: [tienePermisoGuard('vista_boletines')],
+        title: 'Boletines · Sistema Académico',
+        loadChildren: () => import('./features/boletines/boletines.routes').then((m) => m.BOLETINES_ROUTES),
+      },
+
+      {
         path: 'matriculas',
         canActivate: [tienePermisoGuard('vista_matriculas')],
         title: 'Matrículas · Sistema Académico',

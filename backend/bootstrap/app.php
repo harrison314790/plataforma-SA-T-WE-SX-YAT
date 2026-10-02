@@ -13,6 +13,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -104,7 +105,13 @@ return Application::configure(basePath: dirname(__DIR__))
             ], 401);
         });
 
-        $exceptions->render(function (AuthorizationException $e, Request $request) {
+        // `AccessDeniedHttpException` tiene que estar en la firma: Laravel
+        // convierte toda `AuthorizationException` (la de un `authorize()`
+        // de Form Request, o una lanzada a mano) en esa excepción ANTES de
+        // llamar a estos callbacks. Con solo `AuthorizationException`, este
+        // bloque nunca corría y un 403 salía como 500 "Error interno" por
+        // el manejador genérico de abajo. Ver Handler::render() del framework.
+        $exceptions->render(function (AuthorizationException|AccessDeniedHttpException $e, Request $request) {
             if (! $request->is('api/*')) {
                 return null;
             }

@@ -1,0 +1,544 @@
+@if (sinPermiso()) {
+  <app-sin-permiso />
+} @else {
+  <section class="pagina">
+    <header class="pagina__cabecera">
+      <div class="pagina__encabezado">
+        <h1 class="pagina__titulo">Nudos pedagógicos</h1>
+        <p class="pagina__ayuda">
+          Agrupa las materias en los nudos del boletín. En el boletín oficial cuenta la nota del nudo, no la de cada materia.
+        </p>
+      </div>
+
+      <div class="pagina__acciones">
+        <!-- Capa 1. Laravel exige `btn_gestionar_nudos` y RLS solo deja
+             escribir a admin. -->
+        <button
+          *appHasRole="'btn_gestionar_nudos'"
+          type="button"
+          class="boton boton--primario boton--grande"
+          [disabled]="!enLinea()"
+          [title]="enLinea() ? '' : 'Sin conexión: no se puede crear un nudo ahora'"
+          (click)="abrirAlta()"
+        >
+          <span class="boton__mas" aria-hidden="true">+</span>
+          Nuevo nudo
+        </button>
+      </div>
+    </header>
+
+    @if (aviso(); as mensaje) {
+      <div class="aviso aviso--tarjeta" [class.aviso--ok]="!avisoPendiente()" [class.aviso--pendiente]="avisoPendiente()" role="status">
+        <app-icono [nombre]="avisoPendiente() ? 'alerta' : 'visto'" [tamano]="16" />
+        <span class="aviso__texto">{{ mensaje }}</span>
+        @if (avisoPendiente(); as destino) {
+          <a
+            class="boton boton--secundario boton--compacto"
+            routerLink="/porcentajes"
+            [queryParams]="{ grado: destino.grado, anio: destino.anio }"
+          >
+            Revisar porcentajes
+          </a>
+        }
+        <button type="button" class="aviso__cerrar" aria-label="Cerrar aviso" (click)="cerrarAviso()">
+          <app-icono nombre="equis" [tamano]="16" />
+        </button>
+      </div>
+    }
+    @if (errorDeAccion(); as mensaje) {
+      <p class="aviso aviso--tarjeta aviso--error" role="alert">
+        <app-icono nombre="alerta" [tamano]="16" />
+        <span class="aviso__texto">{{ mensaje }}</span>
+      </p>
+    }
+
+    @if (cargando()) {
+      <app-estado-cargando [filas]="8" />
+    } @else if (error() !== null) {
+      <app-estado-error [mensaje]="error()!" (reintentar)="cargar()" />
+    } @else if (nudos().length === 0) {
+      <app-estado-vacio
+        mensaje="Todavía no hay nudos pedagógicos. Crea los nudos del boletín con “Nuevo nudo” y luego ubica cada materia en el suyo."
+        textoAccion="Crear el primer nudo"
+        (accion)="abrirAlta()"
+      />
+    } @else {
+      <!-- Cifras del catálogo. La que exige acción ("sin nudo") es además
+           un botón que filtra la tabla de materias. -->
+      <div class="cifras">
+        <div class="cifra">
+          <span class="cifra__rotulo">Nudos pedagógicos</span>
+          <span class="cifra__valor">{{ resumen().nudos }}</span>
+          <span class="cifra__detalle">En el orden del boletín impreso</span>
+        </div>
+        <div class="cifra">
+          <span class="cifra__rotulo">Materias ubicadas</span>
+          <span class="cifra__valor">{{ resumen().ubicadas }}</span>
+          <span class="cifra__detalle">de {{ plural(resumen().materias, 'materia', 'materias') }} del catálogo</span>
+        </div>
+        <div class="cifra">
+          <span class="cifra__rotulo">Asignaciones {{ anio() }}</span>
+          <span class="cifra__valor">{{ resumen().asignaciones }}</span>
+          <span class="cifra__detalle">{{ plural(resumen().profesores, 'profesor dicta', 'profesores dictan') }} materias</span>
+        </div>
+        @if (resumen().sinNudo > 0) {
+          <button type="button" class="cifra cifra--pendiente" (click)="verMaterias('sin-nudo')">
+            <span class="cifra__rotulo"><span class="marca-pendiente" aria-hidden="true">!</span> Materias sin nudo</span>
+            <span class="cifra__valor">{{ resumen().sinNudo }}</span>
+            <span class="cifra__detalle cifra__detalle--enlace">No entran en el boletín · Ver cuáles</span>
+          </button>
+        } @else {
+          <div class="cifra">
+            <span class="cifra__rotulo">Materias sin nudo</span>
+            <span class="cifra__valor cifra__valor--ok">0</span>
+            <span class="cifra__detalle">Todas entran en el boletín</span>
+          </div>
+        }
+      </div>
+
+      <!-- ── Nudos ─────────────────────────────────────────────── -->
+      <section class="tarjeta" aria-labelledby="t-nudos">
+        <header class="tarjeta__cabecera">
+          <h2 class="tarjeta__titulo" id="t-nudos">Nudos del boletín</h2>
+          <p class="tarjeta__ayuda">Haz clic en un nudo para ver sus materias abajo.</p>
+        </header>
+
+        <div class="tabla-contenedor">
+          <table class="tabla-nudos">
+            <caption class="solo-lector">Nudos pedagógicos en el orden del boletín impreso.</caption>
+            <thead>
+              <tr>
+                <th scope="col" class="tabla-nudos__col-orden">Orden</th>
+                <th scope="col">Nudo y sus materias</th>
+                <th scope="col" class="tabla-nudos__col-cifra">Asignaciones</th>
+                <th scope="col" class="tabla-nudos__col-cifra">Profesores</th>
+                <th scope="col" class="tabla-nudos__col-grados">Con % en</th>
+                <th scope="col" class="tabla-nudos__col-acciones">Acciones</th>
+              </tr>
+            </thead>
+            @for (fila of filasNudo(); track fila.nudo.id) {
+              <tbody class="fila-nudo" [class.fila-nudo--elegida]="filtroNudo() === fila.nudo.id">
+                <tr (click)="verMaterias(fila.nudo.id)">
+                  <td><span class="orden">{{ fila.nudo.orden }}</span></td>
+                  <th scope="row">
+                    <button
+                      type="button"
+                      class="fila-nudo__nombre"
+                      [attr.aria-pressed]="filtroNudo() === fila.nudo.id"
+                      (click)="$event.stopPropagation(); verMaterias(fila.nudo.id)"
+                    >
+                      {{ fila.nudo.nombre }}
+                    </button>
+                    @if (fila.materias.length === 0) {
+                      <span class="fila-nudo__vacio">Sin materias</span>
+                    } @else {
+                      <ul class="chips">
+                        @for (m of fila.materias; track m.id) {
+                          <li
+                            class="chip"
+                            [class.chip--tenue]="m.asignaciones === 0"
+                            [title]="m.asignaciones === 0 ? 'No se dicta en ' + anio() : cursosTexto(m.cursos)"
+                          >
+                            {{ m.nombre }}
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </th>
+                  <td class="numero">{{ fila.nudo.asignaciones }}</td>
+                  <td class="numero">{{ fila.nudo.profesores }}</td>
+                  <td>
+                    @if (fila.nudo.gradosConPorcentaje.length > 0) {
+                      <span class="grados">
+                        @for (g of fila.nudo.gradosConPorcentaje; track g) {
+                          <span class="grado-chip">{{ g }}°</span>
+                        }
+                      </span>
+                    } @else {
+                      <span class="tenue">Promedio simple</span>
+                    }
+                  </td>
+                  <td class="tabla-nudos__acciones" (click)="$event.stopPropagation()">
+                    <button
+                      *appHasRole="'btn_gestionar_nudos'"
+                      type="button"
+                      class="accion"
+                      title="Editar"
+                      [attr.aria-label]="'Editar ' + fila.nudo.nombre"
+                      [disabled]="guardando() || !enLinea()"
+                      (click)="abrirEdicion(fila.nudo)"
+                    >
+                      <app-icono nombre="lapiz" [tamano]="18" />
+                    </button>
+                    <!-- Solo con el nudo vacío: con materias adentro,
+                         borrarlo las sacaría del boletín. El backend lo
+                         rechaza igual. -->
+                    <button
+                      *appHasRole="'btn_gestionar_nudos'"
+                      type="button"
+                      class="accion accion--peligro"
+                      [attr.aria-label]="'Eliminar ' + fila.nudo.nombre"
+                      [title]="fila.materias.length === 0 ? 'Eliminar' : 'Tiene ' + plural(fila.materias.length, 'materia', 'materias') + ': muévelas a otro nudo antes de eliminarlo'"
+                      [disabled]="guardando() || !enLinea() || fila.materias.length > 0"
+                      (click)="confirmandoBorrado.set(fila.nudo.id)"
+                    >
+                      <app-icono nombre="papelera" [tamano]="18" />
+                    </button>
+                  </td>
+                </tr>
+                @if (confirmandoBorrado() === fila.nudo.id) {
+                  <tr class="fila-nudo__confirmar">
+                    <td colspan="6">
+                      <div class="aviso aviso--error confirmar-borrado" role="alert">
+                        <span class="aviso__texto">
+                          ¿Eliminar <strong>{{ fila.nudo.nombre }}</strong>? No tiene materias, así que no cambia ningún boletín.
+                        </span>
+                        <span class="confirmar-borrado__acciones">
+                          <button type="button" class="boton boton--fantasma" (click)="confirmandoBorrado.set(null)">Cancelar</button>
+                          <button type="button" class="boton boton--peligro" [disabled]="guardando()" (click)="eliminar(fila.nudo)">
+                            Sí, eliminar
+                          </button>
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            }
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Materias ──────────────────────────────────────────── -->
+      <section class="tarjeta" id="tabla-materias" aria-labelledby="t-materias">
+        <header class="tarjeta__cabecera">
+          <div class="tarjeta__fila">
+            <div>
+              <h2 class="tarjeta__titulo" id="t-materias">Materias</h2>
+              <p class="tarjeta__ayuda">
+                Crea, edita o elimina materias y ubica cada una en su nudo. Una materia sin nudo no entra en ningún cálculo.
+              </p>
+            </div>
+            <button
+              *appHasRole="'btn_gestionar_nudos'"
+              type="button"
+              class="boton boton--secundario boton--mediano"
+              [disabled]="!enLinea()"
+              [title]="enLinea() ? '' : 'Sin conexión: no se puede crear una materia ahora'"
+              (click)="abrirAltaMateria()"
+            >
+              <span class="boton__mas" aria-hidden="true">+</span>
+              Nueva materia
+            </button>
+          </div>
+
+          <div class="tarjeta__filtros">
+            <select class="filtro" aria-label="Filtrar por nudo" (change)="elegirFiltro($any($event.target).value)">
+              <option value="" [selected]="filtroNudo() === null">Todos los nudos</option>
+              <option value="sin-nudo" [selected]="filtroNudo() === 'sin-nudo'">Sin nudo</option>
+              @for (n of nudos(); track n.id) {
+                <option [value]="n.id" [selected]="filtroNudo() === n.id">{{ n.orden }} · {{ n.nombre }}</option>
+              }
+            </select>
+            <input
+              class="filtro filtro--busqueda"
+              type="search"
+              placeholder="Buscar por nombre o código"
+              aria-label="Buscar materia"
+              autocomplete="off"
+              [value]="busqueda()"
+              (input)="busqueda.set($any($event.target).value)"
+            />
+            <span class="tarjeta__conteo" aria-live="polite">{{ plural(materiasFiltradas().length, 'materia', 'materias') }}</span>
+            @if (hayFiltros()) {
+              <button type="button" class="boton boton--enlace" (click)="limpiarFiltros()">Quitar filtros</button>
+            }
+          </div>
+        </header>
+
+        @if (materiasFiltradas().length === 0) {
+          <app-estado-vacio
+            [mensaje]="filtroNudo() === 'sin-nudo' ? 'Todas las materias tienen nudo: ninguna queda por fuera del boletín.' : 'Ninguna materia coincide con estos filtros.'"
+            textoAccion="Ver todas"
+            (accion)="limpiarFiltros()"
+          />
+        } @else {
+          <div class="tabla-contenedor">
+            <table class="tabla-materias">
+              <caption class="solo-lector">Materias con su nudo, su malla curricular y dónde se dictan este año.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Materia</th>
+                  <th scope="col" class="tabla-materias__col-nudo">Nudo</th>
+                  <th scope="col" class="tabla-materias__col-malla">Malla</th>
+                  <th scope="col">Cursos {{ anio() }}</th>
+                  <th scope="col">Profesores</th>
+                  @if (puedeGestionar()) {
+                    <th scope="col" class="tabla-materias__col-acciones">Acciones</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (materia of materiasFiltradas(); track materia.id) {
+                  <tr [class.fila--pendiente]="materia.nudoId === null" [class.fila--sin-borde]="confirmandoBorradoMateria() === materia.id">
+                    <th scope="row">
+                      <span class="materia__nombre">{{ materia.nombre }}</span>
+                      <span class="materia__codigo">
+                        <span class="codigo">{{ materia.codigo }}</span>
+                        @if (materia.nudoId === null) {
+                          <span class="pastilla-pendiente">Sin nudo · fuera del boletín</span>
+                        }
+                      </span>
+                    </th>
+                    <td>
+                      @if (puedeGestionar()) {
+                        <select
+                          class="filtro filtro--ancho"
+                          [class.filtro--alerta]="materia.nudoId === null"
+                          [disabled]="guardando() || !enLinea()"
+                          [attr.aria-label]="'Nudo de ' + materia.nombre"
+                          (change)="moverMateria(materia, $any($event.target).value)"
+                        >
+                          <option value="" [selected]="materia.nudoId === null">— Sin nudo —</option>
+                          @for (n of nudos(); track n.id) {
+                            <option [value]="n.id" [selected]="n.id === materia.nudoId">{{ n.orden }} · {{ n.nombre }}</option>
+                          }
+                        </select>
+                      } @else {
+                        {{ nombreDeNudo(materia.nudoId) }}
+                      }
+                    </td>
+                    <td class="numero">{{ materia.gradosMalla.length > 0 ? tramos(materia.gradosMalla) : '—' }}</td>
+                    <td>{{ cursosTexto(materia.cursos) }}</td>
+                    <td class="tenue">{{ materia.profesores.join(', ') || '—' }}</td>
+                    @if (puedeGestionar()) {
+                      <td class="tabla-nudos__acciones">
+                        <button
+                          type="button"
+                          class="accion"
+                          title="Editar materia"
+                          [attr.aria-label]="'Editar ' + materia.nombre"
+                          [disabled]="guardando() || !enLinea()"
+                          (click)="abrirEdicionMateria(materia)"
+                        >
+                          <app-icono nombre="lapiz" [tamano]="18" />
+                        </button>
+                        <!-- Solo sin asignaciones: con ellas hay notas (o pudo
+                             haberlas) y el boletín las necesita. El backend
+                             lo rechaza igual. -->
+                        <button
+                          type="button"
+                          class="accion accion--peligro"
+                          [attr.aria-label]="'Eliminar ' + materia.nombre"
+                          [title]="motivoNoBorrarMateria(materia) ?? 'Eliminar materia'"
+                          [disabled]="guardando() || !enLinea() || motivoNoBorrarMateria(materia) !== null"
+                          (click)="confirmandoBorradoMateria.set(materia.id)"
+                        >
+                          <app-icono nombre="papelera" [tamano]="18" />
+                        </button>
+                      </td>
+                    }
+                  </tr>
+                  @if (confirmandoBorradoMateria() === materia.id) {
+                    <tr class="fila-confirmar" [class.fila--pendiente]="materia.nudoId === null">
+                      <td colspan="6">
+                        <div class="aviso aviso--error confirmar-borrado" role="alert">
+                          <span class="aviso__texto">
+                            ¿Eliminar la materia <strong>{{ materia.nombre }}</strong>? No tiene asignaciones ni notas, así que no cambia ningún boletín.
+                          </span>
+                          <span class="confirmar-borrado__acciones">
+                            <button type="button" class="boton boton--fantasma" (click)="confirmandoBorradoMateria.set(null)">Cancelar</button>
+                            <button type="button" class="boton boton--peligro" [disabled]="guardando()" (click)="eliminarMateria(materia)">
+                              Sí, eliminar
+                            </button>
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+  </section>
+}
+
+<!-- Alta / edición del nudo, en modal como el formulario de Asignaciones:
+     dos campos no justifican una pantalla aparte. -->
+@if (dialogo(); as d) {
+  <div class="modal" role="presentation" (click)="cerrarDialogo()">
+    <div
+      class="modal__panel modal__panel--angosto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="titulo-nudo"
+      appModal
+      (cerrarModal)="cerrarDialogo()"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="modal__cabecera">
+        <div>
+          <h2 class="modal__titulo" id="titulo-nudo">{{ d.id === null ? 'Nuevo nudo' : 'Editar nudo' }}</h2>
+          <p class="modal__subtitulo">Se guarda en MAYÚSCULAS. El orden define dónde sale en el boletín.</p>
+        </div>
+        <button type="button" class="modal__cerrar" (click)="cerrarDialogo()" aria-label="Cerrar">
+          <app-icono nombre="equis" [tamano]="20" />
+        </button>
+      </header>
+
+      <form class="modal__cuerpo" (submit)="$event.preventDefault(); guardarDialogo()">
+        <label class="campo">
+          <span class="campo__rotulo">Nombre <span class="campo__obligatorio">*</span></span>
+          <input
+            class="campo__control"
+            type="text"
+            maxlength="120"
+            autocomplete="off"
+            placeholder="Ej.: KWE'SX WE'WNXIS PHUSE'JEKA"
+            [value]="nombre()"
+            (input)="nombre.set($any($event.target).value)"
+          />
+          @if (errorDe('nombre'); as mensaje) {
+            <span class="campo__error">{{ mensaje }}</span>
+          } @else if (nombrePrevio()) {
+            <span class="campo__ayuda">Se verá así: <strong>{{ nombrePrevio() }}</strong></span>
+          }
+        </label>
+
+        <label class="campo campo--corto">
+          <span class="campo__rotulo">Orden en el boletín <span class="campo__obligatorio">*</span></span>
+          <input
+            class="campo__control campo__control--codigo"
+            type="number"
+            min="1"
+            max="999"
+            [value]="orden() ?? ''"
+            (input)="escribirOrden($any($event.target).value)"
+          />
+          @if (errorDe('orden'); as mensaje) {
+            <span class="campo__error">{{ mensaje }}</span>
+          } @else {
+            <span class="campo__ayuda">
+              {{ d.id === null ? 'Sugerido: al final del boletín. ' : '' }}Números más bajos salen primero en el boletín.
+            </span>
+          }
+        </label>
+
+        @if (errorDelDialogo(); as mensaje) {
+          <p class="aviso aviso--error" role="alert">
+            <app-icono nombre="alerta" [tamano]="16" />
+            <span>{{ mensaje }}</span>
+          </p>
+        }
+
+        <footer class="modal__pie">
+          <button type="button" class="boton boton--fantasma" (click)="cerrarDialogo()">Cancelar</button>
+          <button type="submit" class="boton boton--primario" [disabled]="!puedeGuardarDialogo()">
+            {{ guardando() ? 'Guardando…' : d.id === null ? 'Crear nudo' : 'Guardar cambios' }}
+          </button>
+        </footer>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Alta / edición de materia. El código solo se escribe al crear: después
+     lo usan las asignaciones, la malla y las notas. -->
+@if (dialogoMateria(); as d) {
+  <div class="modal" role="presentation" (click)="cerrarDialogoMateria()">
+    <div
+      class="modal__panel modal__panel--angosto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="titulo-materia"
+      appModal
+      (cerrarModal)="cerrarDialogoMateria()"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="modal__cabecera">
+        <div>
+          <h2 class="modal__titulo" id="titulo-materia">{{ d.id === null ? 'Nueva materia' : 'Editar materia' }}</h2>
+          <p class="modal__subtitulo">Luego se asigna a profesores y cursos en el módulo Asignaciones.</p>
+        </div>
+        <button type="button" class="modal__cerrar" (click)="cerrarDialogoMateria()" aria-label="Cerrar">
+          <app-icono nombre="equis" [tamano]="20" />
+        </button>
+      </header>
+
+      <form class="modal__cuerpo" (submit)="$event.preventDefault(); guardarMateria()">
+        <label class="campo">
+          <span class="campo__rotulo">Nombre <span class="campo__obligatorio">*</span></span>
+          <input
+            class="campo__control"
+            type="text"
+            maxlength="120"
+            autocomplete="off"
+            placeholder="Ej.: Danza Tradicional"
+            [value]="nombreMateria()"
+            (input)="escribirNombreMateria($any($event.target).value)"
+          />
+          @if (errorDeMateria('nombre'); as mensaje) {
+            <span class="campo__error">{{ mensaje }}</span>
+          }
+        </label>
+
+        @if (d.codigoOriginal === null) {
+          <label class="campo">
+            <span class="campo__rotulo">Código <span class="campo__obligatorio">*</span></span>
+            <input
+              class="campo__control campo__control--codigo campo-codigo"
+              type="text"
+              maxlength="6"
+              autocomplete="off"
+              placeholder="DAN"
+              [value]="codigoMateria()"
+              (input)="escribirCodigo($any($event.target))"
+            />
+            @if (errorDeMateria('codigo'); as mensaje) {
+              <span class="campo__error">{{ mensaje }}</span>
+            } @else {
+              <span class="campo__ayuda">De 2 a 6 letras. Se sugiere a partir del nombre.</span>
+            }
+          </label>
+        } @else {
+          <div class="campo">
+            <span class="campo__rotulo">Código</span>
+            <span class="codigo-fijo">{{ d.codigoOriginal }}</span>
+            <span class="campo__ayuda">El código no se cambia: lo usan las asignaciones y las notas.</span>
+          </div>
+        }
+
+        <label class="campo">
+          <span class="campo__rotulo">Nudo pedagógico</span>
+          <select class="campo__control" (change)="elegirNudoMateria($any($event.target).value)">
+            <option value="" [selected]="nudoMateria() === null">— Sin nudo —</option>
+            @for (n of nudos(); track n.id) {
+              <option [value]="n.id" [selected]="n.id === nudoMateria()">{{ n.orden }} · {{ n.nombre }}</option>
+            }
+          </select>
+          @if (errorDeMateria('nudo_pedagogico_id'); as mensaje) {
+            <span class="campo__error">{{ mensaje }}</span>
+          }
+          <span class="ayuda-nudo" [class.ayuda-nudo--pendiente]="ayudaNudoMateria().pendiente">{{ ayudaNudoMateria().texto }}</span>
+        </label>
+
+        @if (errorDialogoMateria(); as mensaje) {
+          <p class="aviso aviso--error" role="alert">
+            <app-icono nombre="alerta" [tamano]="16" />
+            <span>{{ mensaje }}</span>
+          </p>
+        }
+
+        <footer class="modal__pie">
+          <button type="button" class="boton boton--fantasma" (click)="cerrarDialogoMateria()">Cancelar</button>
+          <button type="submit" class="boton boton--primario" [disabled]="!puedeGuardarMateria()">
+            {{ guardando() ? 'Guardando…' : d.id === null ? 'Crear materia' : 'Guardar cambios' }}
+          </button>
+        </footer>
+      </form>
+    </div>
+  </div>
+}

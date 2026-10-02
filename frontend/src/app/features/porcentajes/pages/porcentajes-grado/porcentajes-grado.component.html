@@ -1,0 +1,304 @@
+@if (sinPermiso()) {
+  <app-sin-permiso />
+} @else {
+  <section class="pagina">
+    <header class="pagina__cabecera">
+      <div class="pagina__encabezado">
+        <h1 class="pagina__titulo">Porcentajes por grado</h1>
+        <p class="pagina__ayuda">
+          Cuánto pesa cada materia dentro de su nudo, de 6° a 11°. Se configura una vez por grado al empezar el año;
+          primaria siempre usa promedio simple.
+        </p>
+      </div>
+
+      <div class="pagina__acciones">
+        <label class="selector-anio">
+          <span>Año</span>
+          <select
+            class="filtro filtro--corto filtro--numero"
+            [disabled]="cargando() || guardando()"
+            (change)="elegirAnio($any($event.target))"
+          >
+            @for (a of opciones()?.anios ?? []; track a) {
+              <option [value]="a" [selected]="a === anio()">{{ a }}</option>
+            }
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <!-- Pestañas de grado con su estado: lo primero que necesita saber el
+         admin en enero es qué grados le faltan. Nunca color solo: cada
+         estado lleva su ícono y su texto. -->
+    <div class="pestanas-grado" role="tablist" aria-label="Grado">
+      @for (g of opciones()?.grados ?? []; track g) {
+        <button
+          type="button"
+          role="tab"
+          class="pestana-grado"
+          [class.pestana-grado--activa]="g === grado()"
+          [attr.aria-selected]="g === grado()"
+          [disabled]="cargando() || guardando()"
+          (click)="elegirGrado(g)"
+        >
+          <span class="pestana-grado__fila">
+            <span class="pestana-grado__numero">{{ g }}°</span>
+            @if (!cargando()) {
+              <span class="pestana-grado__grupos">{{ gruposDeGrado(g) }}</span>
+            }
+          </span>
+          @if (!cargando()) {
+            <span class="estado-chip estado-chip--{{ tonoGrado(g) }}">
+              @switch (estadoGrado(g)) {
+                @case ('completo') { <app-icono nombre="visto" [tamano]="12" /> }
+                @case ('incompleto') { <app-icono nombre="alerta" [tamano]="12" /> }
+                @case ('parcial') { <span aria-hidden="true">◐</span> }
+                @case ('sin-configurar') { <span aria-hidden="true">=</span> }
+                @default { <span aria-hidden="true">–</span> }
+              }
+              {{ textoEstadoGrado(g) }}
+            </span>
+          }
+        </button>
+      }
+    </div>
+
+    @if (aviso(); as mensaje) {
+      <p class="aviso aviso--tarjeta aviso--ok" role="status">
+        <app-icono nombre="visto" [tamano]="16" />
+        <span class="aviso__texto">{{ mensaje }}</span>
+      </p>
+    }
+    @if (errorGeneral(); as mensaje) {
+      <p class="aviso aviso--tarjeta aviso--error" role="alert">
+        <app-icono nombre="alerta" [tamano]="16" />
+        <span class="aviso__texto">{{ mensaje }}</span>
+      </p>
+    }
+
+    @if (cargando()) {
+      <app-estado-cargando [filas]="8" />
+    } @else if (error() !== null) {
+      <app-estado-error [mensaje]="error()!" (reintentar)="cargarAnio()" />
+    } @else if (nudos().length === 0) {
+      <app-estado-vacio
+        [mensaje]="grado() + '° no tiene asignaciones en ' + anio() + '. Cuando se creen las asignaciones de este grado en el módulo Asignaciones, aquí podrás repartir los porcentajes.'"
+      />
+    } @else {
+      <p class="aviso aviso--tarjeta aviso--info">
+        <span class="marca-info" aria-hidden="true">i</span>
+        <span class="aviso__texto">
+          Configuración de {{ grado() }}° para {{ anio() }}.
+          @if (grupos()) {
+            Vale para {{ grupos().includes(' y ') ? 'los grupos' : 'el grupo' }} {{ grupos() }} y todas las sedes:
+          } @else {
+            Vale para todas las sedes:
+          }
+          se configura por grado, no por grupo.
+        </span>
+      </p>
+
+      @if ((configuracion()!.sinNudo).length > 0) {
+        <p class="aviso aviso--tarjeta aviso--pendiente" role="status">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span class="aviso__texto">
+            <strong>{{ nombresSinNudo() }}</strong>
+            {{ configuracion()!.sinNudo.length > 1 ? 'se dictan' : 'se dicta' }} en {{ grado() }}° pero no
+            {{ configuracion()!.sinNudo.length > 1 ? 'tienen nudo: no entran' : 'tiene nudo: no entra' }} en el boletín.
+          </span>
+          <a class="boton boton--enlace" routerLink="/nudos" [queryParams]="{ filtro: 'sin-nudo' }">Ubicarlas</a>
+        </p>
+      }
+
+      @if (configurables().length === 0) {
+        <app-estado-vacio
+          [mensaje]="'Nada que configurar en ' + grado() + '°: cada nudo tiene una sola materia en este grado, así que la nota del nudo es la de esa materia.'"
+        />
+      }
+
+      @for (nudo of configurables(); track nudo.id) {
+        <section class="tarjeta grupo-nudo" [class.grupo-nudo--error]="erroresPorNudo()[nudo.id]">
+          <header class="grupo-nudo__cabecera">
+            <div class="grupo-nudo__titulos">
+              <span class="grupo-nudo__rotulo">
+                Nudo pedagógico · {{ nudo.materias.length }} {{ nudo.materias.length === 1 ? 'materia' : 'materias' }}
+              </span>
+              <h2 class="grupo-nudo__nombre">{{ nudo.nombre }}</h2>
+            </div>
+            @switch (estadoBorrador(nudo)) {
+              @case ('cerrado') {
+                <span class="estado-chip estado-chip--ok"><app-icono nombre="visto" [tamano]="12" /> Por porcentajes</span>
+              }
+              @case ('abierto') {
+                <span class="estado-chip estado-chip--pendiente"><app-icono nombre="alerta" [tamano]="12" /> Sin cerrar</span>
+              }
+              @default {
+                <span class="estado-chip estado-chip--neutro"><span aria-hidden="true">=</span> Promedio simple</span>
+              }
+            }
+          </header>
+
+          <div class="grupo-nudo__barra">
+            <div class="medidor">
+              <div
+                class="medidor__pista"
+                role="progressbar"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-label="Suma de porcentajes"
+                [attr.aria-valuenow]="suma(nudo) ?? 0"
+              >
+                <span
+                  class="medidor__relleno"
+                  [class.medidor__relleno--vacio]="suma(nudo) === null"
+                  [class.medidor__relleno--ok]="estadoBorrador(nudo) === 'cerrado'"
+                  [class.medidor__relleno--excede]="sumaExcede(nudo)"
+                  [style.width.%]="anchoSuma(nudo)"
+                ></span>
+              </div>
+              <span
+                class="medidor__texto"
+                [class.medidor__texto--ok]="estadoBorrador(nudo) === 'cerrado'"
+                [class.medidor__texto--excede]="sumaExcede(nudo)"
+              >
+                {{ suma(nudo) === null ? '—' : formatear(suma(nudo)!) }} de 100 %
+              </span>
+            </div>
+            <div class="grupo-nudo__acciones">
+              <button type="button" class="boton boton--secundario boton--compacto" [disabled]="guardando()" (click)="repartirIgual(nudo)">
+                Repartir igual
+              </button>
+              <button type="button" class="boton boton--borde boton--compacto" [disabled]="guardando()" (click)="limpiarNudo(nudo)">
+                Promedio simple
+              </button>
+            </div>
+          </div>
+
+          <table class="tabla-porcentajes">
+            <caption class="solo-lector">Porcentaje de cada materia dentro de {{ nudo.nombre }}, {{ grado() }}° {{ anio() }}.</caption>
+            <thead>
+              <tr>
+                <th scope="col">Materia</th>
+                <th scope="col">Profesor y grupos</th>
+                <th scope="col" class="tabla-porcentajes__col-valor">Porcentaje</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (materia of nudo.materias; track materia.id) {
+                <tr>
+                  <th scope="row">
+                    <span class="materia__nombre">{{ materia.nombre }}</span>
+                    <span class="codigo">{{ materia.codigo }}</span>
+                  </th>
+                  <td>
+                    <span class="materia__profes">{{ materia.profesores.join(', ') || 'Sin profesor' }}</span>
+                    <span class="tenue">
+                      {{ materia.grupos.length > 1 ? 'Grupos' : 'Grupo' }} {{ materia.grupos.join(' y ') || '—' }}
+                    </span>
+                  </td>
+                  <td class="tabla-porcentajes__col-valor">
+                    <span class="porcentaje">
+                      <input
+                        class="porcentaje__control"
+                        [class.porcentaje__control--error]="campoConError(nudo, materia.id)"
+                        type="text"
+                        inputmode="decimal"
+                        maxlength="6"
+                        placeholder="—"
+                        autocomplete="off"
+                        [attr.aria-label]="'Porcentaje de ' + materia.nombre"
+                        [disabled]="guardando()"
+                        [value]="borrador()[materia.id]"
+                        (input)="escribir(materia.id, $any($event.target).value)"
+                      />
+                      <span class="porcentaje__signo" aria-hidden="true">%</span>
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          @if (erroresPorNudo()[nudo.id]; as mensaje) {
+            <p class="aviso aviso--error grupo-nudo__error" role="alert">
+              <app-icono nombre="alerta" [tamano]="16" />
+              <span>{{ mensaje }}</span>
+            </p>
+          }
+        </section>
+      }
+
+      @if (unaMateria().length > 0) {
+        <section class="una-materia">
+          <h2 class="una-materia__titulo">Nudos con una sola materia en {{ grado() }}°</h2>
+          <p class="una-materia__ayuda">No llevan porcentaje: la nota del nudo es la de esa materia.</p>
+          <ul class="una-materia__lista">
+            @for (nudo of unaMateria(); track nudo.id) {
+              <li>
+                <span class="una-materia__nudo">{{ nudo.nombre }}</span>
+                <span class="una-materia__materia">{{ nudo.materias[0].nombre }}</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (configurables().length > 0) {
+        <div class="barra-guardar">
+          <span class="barra-guardar__estado">
+            <span class="barra-guardar__punto" [class.barra-guardar__punto--pendiente]="hayCambios()" aria-hidden="true"></span>
+            {{ hayCambios() ? 'Cambios sin guardar en ' + grado() + '°' : 'Todo guardado en ' + grado() + '°' }}
+          </span>
+          <span class="barra-guardar__acciones">
+            <button type="button" class="boton boton--borde" [disabled]="guardando() || !hayCambios()" (click)="descartarCambios()">
+              Descartar cambios
+            </button>
+            <!-- Capa 1. Laravel exige `btn_guardar_porcentajes` y valida que
+                 cada nudo sume 100; RLS solo deja escribir a admin. -->
+            <button
+              *appHasRole="'btn_guardar_porcentajes'"
+              type="button"
+              class="boton boton--primario boton--grande"
+              [disabled]="guardando() || !enLinea() || !hayCambios()"
+              [title]="enLinea() ? '' : 'Sin conexión: no se puede guardar ahora'"
+              (click)="guardar()"
+            >
+              {{ guardando() ? 'Guardando…' : 'Guardar ' + grado() + '°' }}
+            </button>
+          </span>
+        </div>
+      }
+    }
+  </section>
+}
+
+<!-- Cambio de grado o de año con porcentajes sin guardar. -->
+@if (cambioPendiente(); as destino) {
+  <div class="modal" role="presentation" (click)="cambioPendiente.set(null)">
+    <div
+      class="modal__panel modal__panel--angosto"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="titulo-pendiente"
+      aria-describedby="texto-pendiente"
+      appModal
+      (cerrarModal)="cambioPendiente.set(null)"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="modal__cabecera">
+        <h2 class="modal__titulo" id="titulo-pendiente">Tienes cambios sin guardar</h2>
+      </header>
+      <div class="modal__cuerpo">
+        <p class="modal__texto" id="texto-pendiente">
+          Cambiaste porcentajes de {{ grado() }}° y no los guardaste.
+          {{ destino.tipo === 'grado' ? 'Si pasas a ' + destino.valor + '°' : 'Si cambias al año ' + destino.valor }},
+          esos cambios se pierden.
+        </p>
+        <footer class="modal__pie">
+          <button type="button" class="boton boton--secundario" (click)="cambioPendiente.set(null)">Seguir editando</button>
+          <button type="button" class="boton boton--peligro" (click)="descartarYCambiar()">Descartar y continuar</button>
+        </footer>
+      </div>
+    </div>
+  </div>
+}

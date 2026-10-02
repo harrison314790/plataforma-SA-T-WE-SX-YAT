@@ -1,0 +1,219 @@
+@if (sinPermiso()) {
+  <app-sin-permiso />
+} @else {
+  <section class="pagina">
+    <header class="pagina__cabecera no-imprimir">
+      <div class="pagina__encabezado">
+        <h1 class="pagina__titulo">{{ esAdmin() ? 'Boletines' : 'Mi boletín' }}</h1>
+        <p class="pagina__ayuda">
+          @if (esAdmin()) {
+            Revisa e imprime el boletín de cada estudiante. Usa Anterior y Siguiente para recorrer el curso al cierre de la época.
+          } @else {
+            Tus notas por nudo pedagógico en cada época.
+          }
+        </p>
+      </div>
+
+      <div class="pagina__acciones">
+        @if (esAdmin() && estudianteId() !== null) {
+          <div class="navegacion-curso">
+            <button
+              type="button"
+              class="navegacion-curso__boton"
+              [disabled]="posicion() <= 0 || cargandoBoletin()"
+              (click)="mover(-1)"
+            >
+              ‹ Anterior
+            </button>
+            <span class="navegacion-curso__posicion">{{ posicion() + 1 }} de {{ estudiantes().length }}</span>
+            <button
+              type="button"
+              class="navegacion-curso__boton"
+              [disabled]="posicion() >= estudiantes().length - 1 || cargandoBoletin()"
+              (click)="mover(1)"
+            >
+              Siguiente ›
+            </button>
+          </div>
+        }
+
+        @if (boletin()) {
+          <button type="button" class="boton boton--primario boton--grande" (click)="imprimir()">
+            <app-icono nombre="boletin" [tamano]="18" />
+            Imprimir
+          </button>
+        }
+      </div>
+    </header>
+
+    @if (cargando()) {
+      <app-estado-cargando [filas]="8" />
+    } @else if (esAdmin()) {
+      <!-- ── Modo admin ─────────────────────────────────────── -->
+      <div class="tarjeta selector-curso no-imprimir">
+        <label class="campo">
+          <span class="campo__rotulo">Año</span>
+          <select class="campo__control campo__control--codigo" (change)="elegirAnio($any($event.target).value)">
+            @for (a of opciones()?.anios ?? []; track a) {
+              <option [value]="a" [selected]="a === anio()">{{ a }}</option>
+            }
+          </select>
+        </label>
+        <label class="campo">
+          <span class="campo__rotulo">Sede</span>
+          <select class="campo__control" (change)="elegirSede($any($event.target).value)">
+            <option value="" [selected]="sedeId() === null">Elige una sede</option>
+            @for (s of opciones()?.sedes ?? []; track s.id) {
+              <option [value]="s.id" [selected]="s.id === sedeId()">{{ s.nombre }}</option>
+            }
+          </select>
+        </label>
+        <label class="campo">
+          <span class="campo__rotulo">Curso</span>
+          <select class="campo__control" [disabled]="sedeId() === null" (change)="elegirCurso($any($event.target).value)">
+            <option value="" [selected]="curso() === null">Elige un curso</option>
+            @for (c of cursos(); track c.grado + c.grupo) {
+              <option [value]="c.grado + '|' + c.grupo" [selected]="curso() === c.grado + '|' + c.grupo">
+                {{ c.grado }}° {{ c.grupo }}
+              </option>
+            }
+          </select>
+        </label>
+      </div>
+
+      @if (curso() === null) {
+        <app-estado-vacio mensaje="Elige una sede y un curso para ver los boletines de sus estudiantes." />
+      } @else {
+        <div class="boletines">
+          <!-- La lista del curso: se recorre de arriba abajo al cierre de
+               cada época. El elegido se marca con el turquesa de selección. -->
+          <aside class="tarjeta lista-curso no-imprimir" aria-label="Estudiantes del curso">
+            <header class="lista-curso__cabecera">
+              <span class="lista-curso__curso">{{ cursoTexto() }}</span>
+              <span class="lista-curso__conteo">
+                {{ estudiantes().length }} {{ estudiantes().length === 1 ? 'estudiante' : 'estudiantes' }} · por apellido
+              </span>
+            </header>
+            @if (cargandoEstudiantes()) {
+              <app-estado-cargando [filas]="4" />
+            } @else if (estudiantes().length === 0) {
+              <app-estado-vacio [mensaje]="'Este curso no tiene estudiantes matriculados en ' + anio() + '.'" />
+            } @else {
+              <ol class="lista-curso__items">
+                @for (e of estudiantes(); track e.id; let i = $index) {
+                  <li>
+                    <button
+                      type="button"
+                      class="lista-curso__item"
+                      [class.lista-curso__item--activo]="e.id === estudianteId()"
+                      [attr.aria-current]="e.id === estudianteId() ? 'true' : null"
+                      [title]="e.documento"
+                      (click)="elegirEstudiante(e.id)"
+                    >
+                      <span class="lista-curso__numero">{{ i + 1 }}</span>
+                      <span class="lista-curso__nombre">{{ e.nombreCompleto }}</span>
+                    </button>
+                  </li>
+                }
+              </ol>
+            }
+          </aside>
+
+          <div class="boletines__detalle">
+            @if (cargandoBoletin()) {
+              <app-estado-cargando [filas]="10" />
+            } @else if (error() !== null) {
+              <app-estado-error [mensaje]="error()!" (reintentar)="reintentar()" />
+            } @else if (boletin() !== null) {
+              <ng-container *ngTemplateOutlet="resumenYHoja" />
+            } @else if (estudiantes().length > 0) {
+              <app-estado-vacio mensaje="Elige un estudiante de la lista para ver su boletín." />
+            }
+          </div>
+        </div>
+      }
+    } @else {
+      <!-- ── Modo estudiante: directo a su boletín ──────────── -->
+      <!-- Una pestaña por año matriculado, el más reciente primero. Cada
+           una dice en qué curso y sede lo cursó: un estudiante que se
+           trasladó de sede ve cada año donde realmente estuvo. -->
+      @if (aniosPropios().length > 0) {
+        <div class="pestanas-anio no-imprimir" role="tablist" aria-label="Año del boletín">
+          @for (a of aniosPropios(); track a.anio) {
+            <button
+              type="button"
+              role="tab"
+              class="pestana-grado pestana-anio"
+              [class.pestana-grado--activa]="a.anio === anio()"
+              [attr.aria-selected]="a.anio === anio()"
+              [disabled]="cargandoBoletin()"
+              (click)="a.anio !== anio() && elegirAnio(a.anio + '')"
+            >
+              <span class="pestana-grado__fila">
+                <span class="pestana-grado__numero">{{ a.anio }}</span>
+                @if (a.enCurso) {
+                  <span class="estado-chip estado-chip--pendiente">● En curso</span>
+                } @else {
+                  <span class="estado-chip estado-chip--neutro">Cerrado</span>
+                }
+              </span>
+              <span class="pestana-grado__grupos">{{ a.grado }}° {{ a.grupo }}{{ a.sede ? ' · ' + a.sede : '' }}</span>
+            </button>
+          }
+        </div>
+      }
+
+      @if (cargandoBoletin()) {
+        <app-estado-cargando [filas]="10" />
+      } @else if (error() !== null) {
+        <app-estado-error [mensaje]="error()!" (reintentar)="reintentar()" />
+      } @else if (boletin() !== null) {
+        <app-hoja-boletin [boletin]="boletin()!" />
+      }
+    }
+  </section>
+}
+
+<!-- Solo admin: lo que hay que saber antes de imprimir, y las materias
+     del curso que quedaron sin nudo. -->
+<ng-template #resumenYHoja>
+  @if (resumen(); as r) {
+    @if (r.epoca !== null) {
+      <section class="tarjeta resumen no-imprimir" aria-label="Antes de imprimir">
+        <header class="resumen__cabecera">
+          <span class="resumen__titulo">Antes de imprimir · {{ r.epoca }}</span>
+          <span class="tenue">{{ calculo() }}</span>
+        </header>
+        <dl class="resumen__datos">
+          <div class="resumen__dato">
+            <dt>Promedio general</dt>
+            <dd class="resumen__cifra" [class.nota--reprobada]="(r.promedio ?? 5) < 3">
+              @if ((r.promedio ?? 5) < 3) {<span class="nota__icono" aria-hidden="true">✕</span>}{{ nota(r.promedio) }}
+            </dd>
+          </div>
+          <div class="resumen__dato" [class.resumen__dato--riesgo]="r.enBajo.length > 0">
+            <dt>Nudos en desempeño Bajo</dt>
+            <dd [class.resumen__ok]="r.enBajo.length === 0">{{ r.enBajo.length > 0 ? r.enBajo.join(' · ') : 'Ninguno' }}</dd>
+          </div>
+          <div class="resumen__dato" [class.resumen__dato--alerta]="r.faltantes.length > 0">
+            <dt>Materias sin nota</dt>
+            <dd>{{ r.faltantes.length > 0 ? r.faltantes.join(', ') : 'Todas tienen nota' }}</dd>
+          </div>
+        </dl>
+      </section>
+    }
+  }
+
+  @if (boletin()!.sinNudo.length > 0) {
+    <p class="aviso aviso--tarjeta aviso--pendiente no-imprimir" role="status">
+      <app-icono nombre="alerta" [tamano]="16" />
+      <span class="aviso__texto">
+        <strong>{{ nombresSinNudo() }}</strong>
+        {{ boletin()!.sinNudo.length > 1 ? 'no tienen nudo y no entran' : 'no tiene nudo y no entra' }} en este boletín.
+        Ubícalas en Nudos pedagógicos.
+      </span>
+    </p>
+  }
+
+  <app-hoja-boletin [boletin]="boletin()!" />
+</ng-template>

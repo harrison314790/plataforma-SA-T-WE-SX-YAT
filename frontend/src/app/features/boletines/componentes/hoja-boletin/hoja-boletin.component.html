@@ -1,0 +1,160 @@
+@let b = boletin();
+
+<div class="hoja-boletin__marco">
+  <article class="hoja-boletin" aria-label="Boletín de notas">
+    <header class="hoja-boletin__encabezado">
+      <img class="hoja-boletin__escudo" src="assets/imagenes/iconoSAT.png" alt="Escudo de la institución" />
+      <div class="hoja-boletin__institucion">
+        <span class="hoja-boletin__titulo">Boletín de notas</span>
+        <span class="hoja-boletin__nombre">Institución Educativa Sa't We'sx Yat</span>
+        <span class="hoja-boletin__lugar">Santander de Quilichao, Cauca · Resguardo indígena Munchique Los Tigres</span>
+      </div>
+      <div class="hoja-boletin__epoca">
+        <span class="hoja-boletin__rotulo">Época</span>
+        <span class="hoja-boletin__epoca-valor">{{ promedioGeneral() ? nombresEpoca[promedioGeneral()!.epoca].split(' ')[0] : '—' }}</span>
+      </div>
+    </header>
+
+    <dl class="hoja-boletin__datos">
+      <div class="hoja-boletin__dato hoja-boletin__dato--estudiante">
+        <dt>Apellidos y nombres del estudiante</dt>
+        <dd>{{ b.estudiante.nombreCompleto }}</dd>
+      </div>
+      <div class="hoja-boletin__dato">
+        <dt>Grado</dt>
+        <dd>{{ b.gradoNombre }} {{ b.grupo.toUpperCase() }}</dd>
+      </div>
+      <div class="hoja-boletin__dato">
+        <dt>Sede</dt>
+        <dd>{{ b.sede ?? '—' }}</dd>
+      </div>
+      <div class="hoja-boletin__dato">
+        <dt>Documento · Año lectivo</dt>
+        <dd class="hoja-boletin__numero">{{ b.estudiante.documento ?? '—' }} · {{ b.anio }}</dd>
+      </div>
+      <div class="hoja-boletin__dato">
+        <dt>Cálculo de nudos</dt>
+        <dd>{{ calculo() }}</dd>
+      </div>
+    </dl>
+
+    <table class="tabla-boletin">
+      <caption class="solo-lector">Notas por nudo pedagógico, {{ b.gradoNombre }} {{ b.anio }}.</caption>
+      <thead>
+        <tr>
+          <th scope="col" class="tabla-boletin__col-asignatura">Asignaturas</th>
+          @for (p of b.periodos; track p.id; let i = $index) {
+            <th scope="col" class="tabla-boletin__col-nota" [class.tabla-boletin__actual]="i === indiceActual()">
+              {{ epoca(i).replace(' Época', '') }}<br />Época
+            </th>
+          }
+          <th scope="col" class="tabla-boletin__col-nota">Definitiva</th>
+          <th scope="col" class="tabla-boletin__col-desempeno">Desempeño</th>
+        </tr>
+      </thead>
+
+      @for (nudo of b.nudos; track nudo.id) {
+        <tbody class="nudo-boletin" [class.nudo-boletin--primaria]="b.esPrimaria">
+          @if (!b.esPrimaria) {
+            @for (materia of nudo.materias; track materia.id) {
+              <tr class="fila-materia">
+                <th scope="row">
+                  <span class="fila-materia__celda">
+                    <span>{{ materia.nombre }}</span>
+                    @if (materia.peso !== null) {
+                      <span class="fila-materia__peso" [title]="'Aporta ' + porcentaje(materia.peso) + ' a la nota del nudo'">{{ porcentaje(materia.peso) }}</span>
+                    }
+                  </span>
+                </th>
+                @for (valor of materia.notas; track $index; let i = $index) {
+                  <td
+                    class="celda-nota"
+                    [class.tabla-boletin__actual]="i === indiceActual()"
+                    [class.nota--reprobada]="reprobada(valor)"
+                    [class.celda-nota--falta]="valor === null"
+                  >
+                    @if (reprobada(valor)) {<span class="nota__icono" aria-hidden="true">✕</span>}{{ notaDeMateria(valor, i) }}
+                  </td>
+                }
+                <td></td>
+                <td></td>
+              </tr>
+            }
+          }
+          <!-- La fila del nudo es la que cuenta. Gris de solo lectura con
+               borde superior marcado, NO morado: el morado es identidad y
+               la guía lo prohíbe en tablas de notas. -->
+          <tr class="fila-nudo-boletin">
+            <th scope="row">
+              <span class="fila-nudo-boletin__rotulo">Nudo pedagógico</span>
+              <span class="fila-nudo-boletin__nombre">{{ nudo.nombre }}</span>
+              @if (b.esPrimaria) {
+                <span class="fila-nudo-boletin__materias">{{ listaMaterias(nudo) }}</span>
+              }
+            </th>
+            @for (p of nudo.periodos; track $index; let i = $index) {
+              <td class="celda-nota celda-nota--nudo" [class.tabla-boletin__actual]="i === indiceActual()" [class.nota--reprobada]="reprobada(p.nota)">
+                @if (reprobada(p.nota)) {<span class="nota__icono" aria-hidden="true">✕</span>}{{ nota(p.nota) }}@if (p.incompleto) {<span class="nota__marca" title="Falta la nota de alguna materia">*</span>}
+              </td>
+            }
+            <td class="celda-nota celda-nota--nudo" [class.nota--reprobada]="reprobada(nudo.definitiva)">
+              @if (reprobada(nudo.definitiva)) {<span class="nota__icono" aria-hidden="true">✕</span>}{{ nota(nudo.definitiva) }}
+            </td>
+            <td class="celda-desempeno">
+              @if (nudo.desempeno; as d) {
+                <span class="desempeno" [class.desempeno--bajo]="d === 'Bajo'">
+                  <span aria-hidden="true">{{ d === 'Bajo' ? '✕' : '✓' }}</span> {{ d }}
+                </span>
+              } @else if (nudo.esParcial) {
+                <span class="desempeno desempeno--progreso"><span aria-hidden="true">●</span> En progreso</span>
+              }
+            </td>
+          </tr>
+        </tbody>
+      }
+    </table>
+
+    <footer class="hoja-boletin__pie">
+      <div class="hoja-boletin__promedio">
+        <span class="hoja-boletin__rotulo">Promedio general</span>
+        @if (promedioGeneral(); as promedio) {
+          <span class="hoja-boletin__promedio-valor" [class.nota--reprobada]="reprobada(promedio.valor)">
+            @if (reprobada(promedio.valor)) {<span class="nota__icono" aria-hidden="true">✕</span>}{{ nota(promedio.valor) }}
+          </span>
+          <span class="hoja-boletin__promedio-epoca">{{ epoca(promedio.epoca) }}</span>
+        } @else {
+          <span class="hoja-boletin__promedio-valor">—</span>
+          <span class="hoja-boletin__promedio-epoca">Sin notas todavía</span>
+        }
+      </div>
+
+      <table class="escala">
+        <caption class="escala__titulo">Escala de valoración</caption>
+        <tbody>
+          @for (r of b.escala; track r.desempeno) {
+            <tr>
+              <td class="escala__rango">{{ nota(r.desde) }} – {{ nota(r.hasta) }}</td>
+              <td [class.nota--reprobada]="!r.aprobado">{{ r.aprobado ? 'Aprobado' : '✕ Reprobado' }}</td>
+              <td>Desempeño {{ r.desempeno }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </footer>
+
+    <ul class="hoja-boletin__notas">
+      @if (hayIncompletos()) {
+        <li><strong>*</strong> Falta la nota de alguna materia del nudo en esa época; la nota del nudo es parcial.</li>
+      }
+      @if (hayPonderados()) {
+        <li>El porcentaje junto a cada asignatura es lo que aporta a la nota de su nudo en este grado.</li>
+      }
+      <li>La definitiva y el desempeño aparecen cuando están las cuatro épocas.</li>
+    </ul>
+
+    <div class="hoja-boletin__firmas">
+      <span>Rector(a)</span>
+      <span>Director(a) de grupo</span>
+    </div>
+  </article>
+</div>

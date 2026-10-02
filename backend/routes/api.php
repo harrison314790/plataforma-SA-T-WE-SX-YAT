@@ -2,9 +2,12 @@
 
 use App\Http\Controllers\Api\V1\AsignacionController;
 use App\Http\Controllers\Api\V1\AutenticacionController;
+use App\Http\Controllers\Api\V1\BoletinController;
 use App\Http\Controllers\Api\V1\NavegacionController;
 use App\Http\Controllers\Api\V1\NotaController;
+use App\Http\Controllers\Api\V1\NudoPedagogicoController;
 use App\Http\Controllers\Api\V1\OfertaGradoController;
+use App\Http\Controllers\Api\V1\PorcentajeGradoController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -131,6 +134,61 @@ Route::prefix('v1')->group(function () {
 
                 Route::delete('/{ofertaGrado}', [OfertaGradoController::class, 'destroy'])
                     ->middleware('requiere.permiso:btn_gestionar_grados');
+            });
+
+        /*
+         * NUDOS PEDAGÓGICOS -- catálogo de nudos, catálogo de materias
+         * (crear / renombrar / eliminar) y a qué nudo pertenece cada una. Capa encima de asignaciones: no cambia quién dicta
+         * qué ni cómo sube sus notas el profesor.
+         *
+         * `/asignaturas/{asignatura}` tiene un segmento más que
+         * `/{nudo}`, así que no se pisan -- pero va primero igual, para
+         * que el orden no dependa de contar segmentos.
+         */
+        Route::prefix('nudos')
+            ->middleware('requiere.permiso:vista_nudos_pedagogicos')
+            ->group(function () {
+                Route::get('/', [NudoPedagogicoController::class, 'index']);
+
+                Route::middleware('requiere.permiso:btn_gestionar_nudos')->group(function () {
+                    Route::post('/asignaturas', [NudoPedagogicoController::class, 'crearMateria']);
+                    Route::put('/asignaturas/{asignatura}', [NudoPedagogicoController::class, 'actualizarMateria']);
+                    Route::patch('/asignaturas/{asignatura}', [NudoPedagogicoController::class, 'asignarNudo']);
+                    Route::delete('/asignaturas/{asignatura}', [NudoPedagogicoController::class, 'eliminarMateria']);
+                    Route::post('/', [NudoPedagogicoController::class, 'store']);
+                    Route::put('/{nudo}', [NudoPedagogicoController::class, 'update']);
+                    Route::delete('/{nudo}', [NudoPedagogicoController::class, 'destroy']);
+                });
+            });
+
+        /*
+         * PORCENTAJES POR GRADO -- cuánto pesa cada materia en su nudo,
+         * por grado de secundaria (6 a 11) y año. Una sola configuración
+         * por grado: 6-A y 6-B comparten. La suma de 100 por nudo la
+         * valida PorcentajeGradoService, no solo Angular.
+         */
+        Route::prefix('porcentajes')
+            ->middleware('requiere.permiso:vista_porcentajes_grado')
+            ->group(function () {
+                Route::get('/opciones', [PorcentajeGradoController::class, 'opciones']);
+                Route::get('/', [PorcentajeGradoController::class, 'show']);
+                Route::put('/', [PorcentajeGradoController::class, 'update'])
+                    ->middleware('requiere.permiso:btn_guardar_porcentajes');
+            });
+
+        /*
+         * BOLETINES -- por nudo, como el boletín impreso. `vista_boletines`
+         * la tienen admin y estudiante; quién ve el boletín de QUIÉN lo
+         * decide BoletinController (admin: cualquiera; estudiante: solo
+         * `/mio`), y RLS lo respalda.
+         */
+        Route::prefix('boletines')
+            ->middleware('requiere.permiso:vista_boletines')
+            ->group(function () {
+                Route::get('/mio', [BoletinController::class, 'mio']);
+                Route::get('/opciones', [BoletinController::class, 'opciones']);
+                Route::get('/estudiantes', [BoletinController::class, 'estudiantes']);
+                Route::get('/estudiantes/{estudiante}', [BoletinController::class, 'show']);
             });
 
         // Los próximos módulos (usuarios, sedes, asignaturas, períodos,

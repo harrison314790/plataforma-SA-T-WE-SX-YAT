@@ -109,6 +109,18 @@ export const ICONOS = {
    * gráfico. Es la excepción y conviene que siga siendo la única.
    */
   equis: 'M6.8 6.8l10.4 10.4M17.2 6.8L6.8 17.2',
+
+  /*
+   * Los tres de nudos pedagógicos (16-pesos-nudo-por-grado.sql). Mismo
+   * trazo de 1.6 y misma caja de 24 que el resto del set.
+   *
+   * `nudo`: tres materias atadas en un punto -- es literalmente lo que es
+   * un nudo pedagógico. `porcentaje`: el signo, sin adornos. `boletin`:
+   * una hoja con renglones y la fila del nudo marcada al pie.
+   */
+  nudo: 'M12 12.6a2 2 0 100-4 2 2 0 000 4zM12 8.6V4.4M10.3 11.6l-4.6 3.6M13.7 11.6l4.6 3.6M12 4.4h.01M5.7 15.2h.01M18.3 15.2h.01',
+  porcentaje: 'M6.4 17.6L17.6 6.4M8.4 9.6a1.6 1.6 0 100-3.2 1.6 1.6 0 000 3.2zM15.6 17.6a1.6 1.6 0 100-3.2 1.6 1.6 0 000 3.2z',
+  boletin: 'M6 3.6h8.6l3.4 3.4v13.4H6zM14.6 3.6V7H18M8.8 10.6h6.4M8.8 13.4h6.4M8.8 16.8h6.4',
 } as const;
 
 export type NombreDeIcono = keyof typeof ICONOS;
