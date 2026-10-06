@@ -121,6 +121,24 @@ export const ICONOS = {
   nudo: 'M12 12.6a2 2 0 100-4 2 2 0 000 4zM12 8.6V4.4M10.3 11.6l-4.6 3.6M13.7 11.6l4.6 3.6M12 4.4h.01M5.7 15.2h.01M18.3 15.2h.01',
   porcentaje: 'M6.4 17.6L17.6 6.4M8.4 9.6a1.6 1.6 0 100-3.2 1.6 1.6 0 000 3.2zM15.6 17.6a1.6 1.6 0 100-3.2 1.6 1.6 0 000 3.2z',
   boletin: 'M6 3.6h8.6l3.4 3.4v13.4H6zM14.6 3.6V7H18M8.8 10.6h6.4M8.8 13.4h6.4M8.8 16.8h6.4',
+
+  /*
+   * Los del módulo de Usuarios. Primitivas de interfaz como lapiz o
+   * equis -- no salen del escudo -- dibujadas con la misma gramática
+   * (lienzo de 24, trazo redondeado, sin relleno).
+   *
+   * `persona`: una sola, para las pestañas Profesores/Estudiantes (el
+   * plural `personas` es el ícono del MÓDULO en el menú). `lupa`: el
+   * buscador. `candado`: la contraseña inicial y la acción bloqueada.
+   * `copiar`: dos hojas superpuestas. `opciones`: los tres puntos del
+   * menú "Más opciones" de cada fila -- círculos de radio 1 trazados, que
+   * con el trazo del set quedan de ~3.7px, visibles a 18px.
+   */
+  persona: 'M12 11.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5',
+  lupa: 'M10.8 17.3a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM15.6 15.6l4.4 4.4',
+  candado: 'M5.5 11h13v9h-13zM8.2 11V8.2a3.8 3.8 0 017.6 0V11',
+  copiar: 'M9 9h10.5v10.5H9zM15 9V4.5H4.5V15H9',
+  opciones: 'M5 11a1 1 0 100 2 1 1 0 000-2zM12 11a1 1 0 100 2 1 1 0 000-2zM19 11a1 1 0 100 2 1 1 0 000-2z',
 } as const;
 
 export type NombreDeIcono = keyof typeof ICONOS;

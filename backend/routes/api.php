@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\NotaController;
 use App\Http\Controllers\Api\V1\NudoPedagogicoController;
 use App\Http\Controllers\Api\V1\OfertaGradoController;
 use App\Http\Controllers\Api\V1\PorcentajeGradoController;
+use App\Http\Controllers\Api\V1\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -191,7 +192,38 @@ Route::prefix('v1')->group(function () {
                 Route::get('/estudiantes/{estudiante}', [BoletinController::class, 'show']);
             });
 
-        // Los próximos módulos (usuarios, sedes, asignaturas, períodos,
+        /*
+         * USUARIOS -- cuentas de profesores y estudiantes: identidad y
+         * acceso, nada de matrícula ni de asignaciones.
+         *
+         * Mismo esquema que asignaciones: `vista_admin_usuarios` es la
+         * puerta de todo el grupo (incluidas las escrituras), y cada
+         * acción tiene su `btn_*`. Activar/desactivar va dentro de editar
+         * (el toggle "Cuenta activa" del formulario), así que no tiene
+         * código propio. Ver 19-usuarios-modulo.sql.
+         *
+         * `whereUuid`: un id que no es uuid da 404 en la ruta, en vez de
+         * llegar a Postgres y volver como un 500 de sintaxis de uuid.
+         */
+        Route::prefix('usuarios')
+            ->middleware('requiere.permiso:vista_admin_usuarios')
+            ->group(function () {
+                Route::get('/opciones', [UsuarioController::class, 'opciones']);
+                Route::get('/', [UsuarioController::class, 'index']);
+
+                Route::post('/', [UsuarioController::class, 'store'])
+                    ->middleware('requiere.permiso:btn_crear_usuario');
+
+                Route::put('/{usuario}', [UsuarioController::class, 'update'])
+                    ->whereUuid('usuario')
+                    ->middleware('requiere.permiso:btn_editar_usuario');
+
+                Route::delete('/{usuario}', [UsuarioController::class, 'destroy'])
+                    ->whereUuid('usuario')
+                    ->middleware('requiere.permiso:btn_eliminar_usuario');
+            });
+
+        // Los próximos módulos (sedes, asignaturas, períodos,
         // matrículas, recursos/permisos) van acá, con el mismo patrón:
         // dentro de este grupo 'auth.rls', y con
         // 'requiere.permiso:codigo' o 'requiere.superadmin' según

@@ -1,0 +1,363 @@
+@if (sinPermiso()) {
+  <app-sin-permiso />
+} @else {
+  <div class="usuarios-pagina">
+  <section class="usuarios">
+    <header class="usuarios__cabecera">
+      <div class="usuarios__titulos">
+        <h1 class="usuarios__titulo">Usuarios</h1>
+        <p class="usuarios__ayuda">
+          Cuentas de acceso de profesores y estudiantes. El grado, grupo y sede del
+          estudiante se manejan en Matrículas.
+        </p>
+      </div>
+
+      <!-- Capa 1: oculta el botón. Laravel verifica el mismo código
+           (`requiere.permiso:btn_crear_usuario`) y RLS respalda el insert
+           (`usuarios_admin_inserta`). -->
+      <button
+        *appHasRole="'btn_crear_usuario'"
+        type="button"
+        class="boton boton--primario"
+        [disabled]="!enLinea()"
+        [title]="enLinea() ? '' : 'Sin conexión: no se puede crear una cuenta ahora'"
+        (click)="abrirAlta()"
+      >
+        <span class="boton__mas" aria-hidden="true">+</span>
+        {{ textoNuevo() }}
+      </button>
+    </header>
+
+    @if (aviso(); as a) {
+      <div class="banner" [class.banner--ok]="a.tipo === 'ok'" role="status">
+        <span class="banner__icono" aria-hidden="true">{{ a.tipo === 'ok' ? '✓' : '–' }}</span>
+        <span class="banner__texto">{{ a.texto }}</span>
+        <button type="button" class="banner__cerrar" aria-label="Cerrar aviso" (click)="cerrarAviso()">×</button>
+      </div>
+    }
+
+    @if (errorDeAccion(); as mensaje) {
+      <p class="aviso aviso--error" role="alert">
+        <app-icono nombre="alerta" [tamano]="16" />
+        <span>{{ mensaje }}</span>
+      </p>
+    }
+
+    <div class="usuarios__tarjeta">
+      <!-- Pestañas: el mismo listado y el mismo lenguaje para los dos tipos. -->
+      <div class="pestanas" role="tablist" aria-label="Tipo de cuenta">
+        @for (p of pestanas; track p.tipo) {
+          <button
+            type="button"
+            role="tab"
+            class="pestana"
+            [class.pestana--activa]="pestana() === p.tipo"
+            [attr.aria-selected]="pestana() === p.tipo"
+            (click)="elegirPestana(p.tipo)"
+          >
+            <app-icono nombre="persona" [tamano]="18" />
+            <span>{{ p.rotulo }}</span>
+            <span class="pestana__conteo">{{ cargando() ? '–' : conteoPorTipo()[p.tipo] }}</span>
+          </button>
+        }
+      </div>
+
+      <div class="usuarios__filtros" role="search">
+        <label class="buscador">
+          <span class="tabla__leyenda">Buscar por nombre o documento</span>
+          <app-icono nombre="lupa" [tamano]="18" />
+          <input
+            type="search"
+            class="buscador__campo"
+            placeholder="Buscar por nombre o documento"
+            autocomplete="off"
+            [value]="busqueda()"
+            (input)="buscar($any($event.target).value)"
+          />
+        </label>
+
+        <div class="segmentado" role="radiogroup" aria-label="Estado">
+          @for (e of estados; track e.valor) {
+            <button
+              type="button"
+              role="radio"
+              class="segmentado__opcion"
+              [class.segmentado__opcion--activa]="estado() === e.valor"
+              [attr.aria-checked]="estado() === e.valor"
+              (click)="elegirEstado(e.valor)"
+            >
+              {{ e.rotulo }}
+              <span class="segmentado__conteo">{{ conteoPorEstado()[e.valor] }}</span>
+            </button>
+          }
+        </div>
+
+        <span class="usuarios__conteo" aria-live="polite">
+          {{ cargando() ? 'Cargando…' : textoConteo() }}
+        </span>
+      </div>
+
+      @if (cargando()) {
+        <!-- Skeleton con la forma de la fila (avatar + nombre), no barras
+             genéricas: la tabla "aparece" en vez de saltar. -->
+        <div class="usuarios__esqueleto" aria-busy="true" aria-label="Cargando cuentas">
+          @for (ancho of anchosEsqueleto; track $index) {
+            <div class="usuarios__esqueleto-fila">
+              <span class="usuarios__esqueleto-avatar"></span>
+              <span class="usuarios__esqueleto-barra" [style.width]="ancho"></span>
+            </div>
+          }
+        </div>
+      } @else if (error() !== null) {
+        <div class="usuarios__error" role="alert">
+          <span class="usuarios__error-icono" aria-hidden="true">✕</span>
+          <h2>No pudimos cargar las cuentas</h2>
+          <p>{{ error() }}</p>
+          <button type="button" class="boton boton--primario" (click)="cargar()">Reintentar</button>
+        </div>
+      } @else if (visibles().length === 0) {
+        <!-- Dos vacíos con salidas opuestas: crear la primera cuenta, o
+             quitar los filtros que esconden las que ya hay. -->
+        <div class="usuarios__vacio">
+          <span class="usuarios__vacio-icono" aria-hidden="true">
+            <app-icono nombre="lupa" [tamano]="24" />
+          </span>
+          @if (conteoPorTipo()[pestana()] === 0) {
+            <h2>Todavía no hay cuentas de {{ esProfesores() ? 'profesores' : 'estudiantes' }}</h2>
+            <p>Crea la primera con “{{ textoNuevo() }}”.</p>
+          } @else if (busqueda().trim()) {
+            <h2>Ningún {{ esProfesores() ? 'profesor' : 'estudiante' }} coincide con “{{ busqueda().trim() }}”</h2>
+            <p>
+              Revisa cómo está escrito o busca por número de documento.
+              @if (estado() !== 'todos') { También puedes mirar en “Todos”. }
+            </p>
+          } @else {
+            <h2>No hay {{ esProfesores() ? 'profesores' : 'estudiantes' }} {{ estado() }}</h2>
+            <p>Prueba con otro filtro de estado.</p>
+          }
+          <div class="usuarios__vacio-acciones">
+            @if (hayFiltros() && conteoPorTipo()[pestana()] > 0) {
+              <button type="button" class="boton boton--secundario" (click)="limpiarFiltros()">
+                Limpiar filtros
+              </button>
+            }
+            <button
+              *appHasRole="'btn_crear_usuario'"
+              type="button"
+              class="boton boton--primario"
+              [disabled]="!enLinea()"
+              (click)="abrirAlta()"
+            >
+              + {{ textoNuevo() }}
+            </button>
+          </div>
+        </div>
+      } @else {
+        <div class="tabla-contenedor usuarios__tabla">
+          <table class="tabla">
+            <caption class="tabla__leyenda">
+              {{ esProfesores() ? 'Cuentas de profesores' : 'Cuentas de estudiantes' }}, ordenadas por apellido.
+            </caption>
+
+            <thead>
+              <tr>
+                <th scope="col">Nombre completo</th>
+                <th scope="col">Documento</th>
+                <th scope="col">Email</th>
+                @if (esProfesores()) {
+                  <th scope="col">Sede</th>
+                }
+                <th scope="col">Estado</th>
+                <th scope="col" class="tabla__col-acciones-iconos">
+                  <span class="tabla__leyenda">Acciones</span>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (cuenta of visibles(); track cuenta.id) {
+                <tr
+                  [class.tabla__fila--resaltada]="resaltada() === cuenta.id"
+                  [class.tabla__fila--menu]="menu()?.id === cuenta.id"
+                >
+                  <th scope="row" class="celda-persona" [class.celda-persona--inactiva]="!cuenta.activo">
+                    <span class="avatar" aria-hidden="true">{{ cuenta.iniciales }}</span>
+                    <span class="celda-persona__textos">
+                      <span class="celda-persona__nombre">{{ cuenta.nombreCompleto }}</span>
+                      <!-- Amarillo = pendiente, con su punto y su texto:
+                           nunca color solo. -->
+                      @if (!cuenta.vinculado) {
+                        <span class="insignia-pendiente">
+                          <span class="insignia-pendiente__punto" aria-hidden="true"></span>
+                          {{ esProfesores() ? 'Sin asignaciones todavía' : 'Sin matrícula todavía' }}
+                        </span>
+                      }
+                    </span>
+                  </th>
+
+                  <td class="tabla__celda-numerica">{{ cuenta.documento }}</td>
+                  <td class="celda-email" [title]="cuenta.email">{{ cuenta.email }}</td>
+
+                  @if (esProfesores()) {
+                    <td class="tabla__celda-sede">
+                      @if (cuenta.sede; as sede) {
+                        <app-icono nombre="estrella" [tamano]="14" [relleno]="sede.esPrincipal" />
+                        {{ sede.nombre }}
+                      } @else {
+                        <span class="celda-vacia">Sin sede</span>
+                      }
+                    </td>
+                  }
+
+                  <td>
+                    @if (cuenta.activo) {
+                      <span class="chip-estado chip-estado--activo">
+                        <app-icono nombre="visto" [tamano]="12" />
+                        Activo
+                      </span>
+                    } @else {
+                      <span class="chip-estado chip-estado--inactivo">
+                        <span aria-hidden="true">–</span>
+                        Inactivo
+                      </span>
+                    }
+                  </td>
+
+                  <td class="tabla__celda-acciones celda-iconos">
+                    <button
+                      *appHasRole="'btn_editar_usuario'"
+                      type="button"
+                      class="boton-icono boton-icono--accion"
+                      [title]="accion('btn_editar_usuario').etiqueta"
+                      [attr.aria-label]="accion('btn_editar_usuario').etiqueta + ' ' + cuenta.nombreCompleto"
+                      [disabled]="!enLinea()"
+                      (click)="abrirEdicion(cuenta)"
+                    >
+                      <app-icono [nombre]="accion('btn_editar_usuario').icono ?? 'lapiz'" [tamano]="18" />
+                    </button>
+
+                    <button
+                      type="button"
+                      class="boton-icono"
+                      [class.boton-icono--presionado]="menu()?.id === cuenta.id"
+                      title="Más opciones"
+                      [attr.aria-label]="'Más opciones para ' + cuenta.nombreCompleto"
+                      aria-haspopup="menu"
+                      [attr.aria-expanded]="menu()?.id === cuenta.id"
+                      (click)="alternarMenu($event, cuenta)"
+                    >
+                      <app-icono nombre="opciones" [tamano]="18" />
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </section>
+  </div>
+}
+
+<!--
+  El menú de "Más opciones", fuera de la tabla y en `position: fixed`:
+  dentro de la celda lo recortaría el `overflow` del contenedor con scroll
+  horizontal.
+-->
+@if (menu(); as m) {
+  @if (cuentaDelMenu(); as cuenta) {
+    <div
+      class="menu-opciones"
+      role="menu"
+      aria-label="Más opciones"
+      [style.top]="m.top"
+      [style.bottom]="m.bottom"
+      [style.right]="m.right"
+    >
+      <button
+        *appHasRole="'btn_editar_usuario'"
+        type="button"
+        role="menuitem"
+        class="menu-opciones__item"
+        [disabled]="!enLinea()"
+        (click)="abrirEdicion(cuenta)"
+      >
+        <app-icono [nombre]="accion('btn_editar_usuario').icono ?? 'lapiz'" [tamano]="16" />
+        {{ accion('btn_editar_usuario').etiqueta }}
+      </button>
+
+      <ng-container *appHasRole="'btn_eliminar_usuario'">
+        <div class="menu-opciones__separador" aria-hidden="true"></div>
+
+        @if (cuenta.eliminable) {
+          <button
+            type="button"
+            role="menuitem"
+            class="menu-opciones__item menu-opciones__item--peligro"
+            [disabled]="!enLinea()"
+            (click)="abrirBorrado(cuenta)"
+          >
+            <app-icono [nombre]="accion('btn_eliminar_usuario').icono ?? 'papelera'" [tamano]="16" />
+            {{ accion('btn_eliminar_usuario').etiqueta }}
+          </button>
+        } @else {
+          <!-- Deshabilitado pero ENFOCABLE: un `disabled` real sacaría el
+               ítem del orden de Tab y quien usa teclado nunca sabría por qué
+               no está la opción. El tooltip aparece con hover o con foco. -->
+          <div class="menu-opciones__bloqueado">
+            <div
+              role="menuitem"
+              aria-disabled="true"
+              tabindex="0"
+              aria-describedby="tip-eliminar"
+              class="menu-opciones__item menu-opciones__item--deshabilitado"
+            >
+              <app-icono [nombre]="accion('btn_eliminar_usuario').icono ?? 'papelera'" [tamano]="16" />
+              {{ accion('btn_eliminar_usuario').etiqueta }}
+              <app-icono class="menu-opciones__candado" nombre="candado" [tamano]="15" />
+            </div>
+            <div
+              id="tip-eliminar"
+              role="tooltip"
+              class="tooltip"
+              [class.tooltip--arriba]="m.haciaArriba"
+            >
+              No se puede eliminar una cuenta con datos asociados — desactívala en su lugar.
+            </div>
+          </div>
+        }
+      </ng-container>
+    </div>
+  }
+}
+
+@if (formularioAbierto()) {
+  @if (opciones(); as catalogos) {
+    <app-formulario-usuario
+      [opciones]="catalogos"
+      [tipoNuevo]="pestana()"
+      [cuenta]="enFormulario()"
+      [guardando]="guardando()"
+      [errores]="erroresDeCampo()"
+      [errorGeneral]="errorDelFormulario()"
+      [sinConexion]="!enLinea()"
+      (guardar)="guardarFormulario($event)"
+      (cerrar)="cerrarFormulario()"
+    />
+  }
+}
+
+@if (creada(); as c) {
+  <app-dialogo-cuenta-creada [cuenta]="c.cuenta" [contrasena]="c.contrasena" (cerrar)="cerrarCreada()" />
+}
+
+@if (enBorrado(); as cuenta) {
+  <app-dialogo-eliminar-usuario
+    [cuenta]="cuenta"
+    [guardando]="guardando()"
+    [error]="errorDelBorrado()"
+    (eliminar)="eliminar()"
+    (cerrar)="cerrarBorrado()"
+  />
+}

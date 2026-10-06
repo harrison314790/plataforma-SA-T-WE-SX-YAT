@@ -26,7 +26,9 @@
       <!-- El alta va ARRIBA y en una sola fila: es la acción que trae a la
            gente a este modal, y dejarla al final obligaría a pasar por
            toda la lista para llegar. -->
-      <form class="alta-grado" (ngSubmit)="crear()">
+      <!-- `(submit)` + preventDefault, no `(ngSubmit)`: ver la nota del
+           formulario de asignaciones (sin FormsModule recargaba la página). -->
+      <form class="alta-grado" novalidate (submit)="$event.preventDefault(); crear()">
         <label class="campo">
           <span class="campo__rotulo">Sede</span>
           <select

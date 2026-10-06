@@ -1,0 +1,45 @@
+<div class="modal modal--usuarios modal--centrado" role="presentation" (click)="cerrar.emit()">
+  <div
+    class="modal__panel confirmacion"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="titulo-eliminar-cuenta"
+    appModal
+    (cerrarModal)="cerrar.emit()"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="confirmacion__titulo" id="titulo-eliminar-cuenta">
+      ¿Eliminar la cuenta de {{ cuenta().nombreCompleto }}?
+    </h2>
+
+    <!-- Nunca pedir una confirmación sin mostrar sobre qué. -->
+    <div class="confirmacion__ficha">
+      <span class="confirmacion__nombre">{{ cuenta().nombreCompleto }}</span>
+      <span class="confirmacion__dato">{{ cuenta().documento }} · {{ cuenta().email }}</span>
+    </div>
+
+    <p class="confirmacion__texto">
+      Esta cuenta no tiene datos asociados, así que se puede borrar.
+      <span class="confirmacion__secundario">No se puede deshacer.</span>
+    </p>
+
+    @if (error(); as mensaje) {
+      <p class="aviso aviso--error" role="alert">
+        <app-icono nombre="alerta" [tamano]="16" />
+        <span>{{ mensaje }}</span>
+      </p>
+    }
+
+    <div class="confirmacion__botones">
+      <button type="button" class="boton boton--neutro" (click)="cerrar.emit()">Cancelar</button>
+      <button
+        type="button"
+        class="boton boton--peligro"
+        [disabled]="guardando()"
+        (click)="eliminar.emit()"
+      >
+        {{ guardando() ? 'Eliminando…' : 'Eliminar cuenta' }}
+      </button>
+    </div>
+  </div>
+</div>

@@ -18,7 +18,7 @@
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
             "assets": ["src/assets"],
-            "styles": ["src/styles.css", "src/estilos/marco.css", "src/estilos/asignaciones.css", "src/estilos/nudos.css"],
+            "styles": ["src/styles.css", "src/estilos/marco.css", "src/estilos/asignaciones.css", "src/estilos/nudos.css", "src/estilos/usuarios.css"],
             "scripts": []
           },
           "configurations": {

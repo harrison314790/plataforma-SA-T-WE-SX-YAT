@@ -1,0 +1,235 @@
+<!--
+  Mismo armazón que el formulario de Asignaciones: velo que cierra al
+  clic, `appModal` para Escape / foco / trampa de Tab, cabecera con la X,
+  cuerpo con los campos y pie con Cancelar / acción principal.
+-->
+<div class="modal modal--usuarios" role="presentation" (click)="cerrar.emit()">
+  <div
+    class="modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="titulo-cuenta"
+    appModal
+    (cerrarModal)="cerrar.emit()"
+    (click)="$event.stopPropagation()"
+  >
+    <header class="modal__cabecera">
+      <div>
+        <h2 class="modal__titulo" id="titulo-cuenta">{{ titulo() }}</h2>
+        <p class="modal__subtitulo">{{ subtitulo() }}</p>
+      </div>
+
+      <button type="button" class="modal__cerrar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <app-icono nombre="equis" [tamano]="20" />
+      </button>
+    </header>
+
+    <form class="modal__cuerpo" novalidate (submit)="enviar($event)">
+      <div class="formulario__par">
+        <label class="campo">
+          <span class="campo__rotulo">Nombres <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+          <input
+            class="campo__control"
+            [class.campo__control--error]="errorDe('nombres')"
+            [value]="nombres()"
+            (input)="cambiarTexto('nombres', $any($event.target).value)"
+            autocomplete="off"
+            required
+            [attr.aria-invalid]="errorDe('nombres') ? 'true' : null"
+          />
+          @if (errorDe('nombres'); as mensaje) {
+            <span class="campo__error" role="alert">✕ {{ mensaje }}</span>
+          }
+        </label>
+
+        <label class="campo">
+          <span class="campo__rotulo">Apellidos <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+          <input
+            class="campo__control"
+            [class.campo__control--error]="errorDe('apellidos')"
+            [value]="apellidos()"
+            (input)="cambiarTexto('apellidos', $any($event.target).value)"
+            autocomplete="off"
+            required
+            [attr.aria-invalid]="errorDe('apellidos') ? 'true' : null"
+          />
+          @if (errorDe('apellidos'); as mensaje) {
+            <span class="campo__error" role="alert">✕ {{ mensaje }}</span>
+          }
+        </label>
+      </div>
+
+      <label class="campo campo--corto">
+        <span class="campo__rotulo">Documento <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+        <input
+          #campoDocumento
+          class="campo__control campo__control--dato"
+          [class.campo__control--error]="errorDe('documento')"
+          inputmode="numeric"
+          placeholder="Solo números"
+          [value]="documento()"
+          (input)="cambiarDocumento(campoDocumento.value, campoDocumento)"
+          autocomplete="off"
+          required
+          [attr.aria-invalid]="errorDe('documento') ? 'true' : null"
+        />
+        @if (errorDe('documento'); as mensaje) {
+          <span class="campo__error" role="alert">✕ {{ mensaje }}</span>
+        } @else {
+          <span class="campo__ayuda">Cédula, tarjeta de identidad o registro civil, sin puntos.</span>
+        }
+      </label>
+
+      <label class="campo">
+        <span class="campo__rotulo">Email <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+        <span class="campo__con-insignia">
+          <input
+            class="campo__control"
+            [class.campo__control--error]="errorDe('email')"
+            [class.campo__control--sugerido]="emailSugerido()"
+            type="email"
+            [placeholder]="esProfesor() ? 'nombre.apellido@sedeprincipal.edu.co' : 'Se sugiere al escribir el documento'"
+            [value]="email()"
+            (input)="cambiarEmail($any($event.target).value)"
+            autocomplete="off"
+            required
+            [attr.aria-invalid]="errorDe('email') ? 'true' : null"
+          />
+          <!-- Nunca color solo: el fondo turquesa claro va con la palabra. -->
+          @if (emailSugerido()) {
+            <span class="insignia-sugerido" aria-hidden="true">Sugerido</span>
+          }
+        </span>
+        @if (errorDe('email'); as mensaje) {
+          <span class="campo__error" role="alert">✕ {{ mensaje }}</span>
+        } @else {
+          <span class="campo__ayuda">{{ ayudaEmail() }}</span>
+        }
+      </label>
+
+      @if (esProfesor()) {
+        <label class="campo">
+          <span class="campo__rotulo">Sede <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+          <select
+            class="campo__control"
+            [class.campo__control--error]="errorDe('sede_id')"
+            [value]="sedeId() ?? ''"
+            (change)="cambiarSede($any($event.target).value)"
+            required
+            [attr.aria-invalid]="errorDe('sede_id') ? 'true' : null"
+          >
+            <option value="" [selected]="sedeId() === null">Elige la sede donde trabaja</option>
+            @for (sede of opciones().sedes; track sede.id) {
+              <option [value]="sede.id" [selected]="sedeId() === sede.id">{{ sede.nombre }}</option>
+            }
+          </select>
+          @if (errorDe('sede_id'); as mensaje) {
+            <span class="campo__error" role="alert">✕ {{ mensaje }}</span>
+          }
+        </label>
+      }
+
+      @if (!esEdicion()) {
+        <!-- Contraseña inicial: ya viene generada al abrir. Se ve en claro
+             a propósito: quien la escribe es quien la va a entregar. -->
+        <div class="bloque-contrasena">
+          <!-- `div` + `for` y no un `<label>` envolvente: adentro hay un
+               input Y un botón, y un label con dos controles no sabe a
+               cuál apunta. -->
+          <div class="campo">
+            <label class="campo__rotulo campo__rotulo--con-icono" for="cuenta-contrasena">
+              <app-icono nombre="candado" [tamano]="16" />
+              Contraseña inicial <span class="campo__obligatorio" aria-hidden="true">*</span>
+            </label>
+            <span class="bloque-contrasena__fila">
+              <input
+                id="cuenta-contrasena"
+                class="campo__control campo__control--dato"
+                [class.campo__control--error]="errorDe('password')"
+                placeholder="Mínimo 8 caracteres"
+                spellcheck="false"
+                autocomplete="off"
+                [value]="contrasena()"
+                (input)="cambiarContrasena($any($event.target).value)"
+                required
+                [attr.aria-invalid]="errorDe('password') ? 'true' : null"
+              />
+              <button type="button" class="boton boton--secundario" (click)="generar()">
+                <app-icono nombre="reintentar" [tamano]="16" />
+                Generar
+              </button>
+            </span>
+            @if (errorDe('password'); as mensaje) {
+              <span class="campo__error" role="alert">✕ {{ mensaje }}</span>
+            } @else {
+              <span class="campo__ayuda">
+                Mínimo 8 caracteres. Al terminar te la mostramos una sola vez para que la entregues.
+              </span>
+            }
+          </div>
+        </div>
+      } @else {
+        <!-- Toggle con su propio color: verde encendido, gris apagado. Y
+             nunca solo color: la palabra "Activa"/"Inactiva" y el ✓ / – dentro
+             del interruptor dicen lo mismo. -->
+        <div class="interruptor-cuenta" [class.interruptor-cuenta--apagado]="!activo()">
+          <div class="interruptor-cuenta__fila">
+            <span class="interruptor-cuenta__textos" id="rotulo-activa">
+              <span class="interruptor-cuenta__titulo">Cuenta activa</span>
+              <span class="interruptor-cuenta__estado">
+                {{ activo() ? 'Puede iniciar sesión.' : 'No puede iniciar sesión.' }}
+              </span>
+            </span>
+
+            <button
+              type="button"
+              role="switch"
+              class="interruptor"
+              [class.interruptor--encendido]="activo()"
+              [attr.aria-checked]="activo()"
+              aria-labelledby="rotulo-activa"
+              (click)="alternarActivo()"
+            >
+              <span class="interruptor__palabra">{{ activo() ? 'Activa' : 'Inactiva' }}</span>
+              <span class="interruptor__riel" aria-hidden="true">
+                <span class="interruptor__pulgar">{{ activo() ? '✓' : '–' }}</span>
+              </span>
+            </button>
+          </div>
+
+          @if (!activo()) {
+            <p class="interruptor-cuenta__nota">
+              No podrá iniciar sesión, pero sus datos históricos (notas, asignaciones,
+              matrículas) se conservan.
+            </p>
+          }
+        </div>
+      }
+
+      @if (sinConexion()) {
+        <p class="aviso aviso--bloqueo" role="status">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>Sin conexión. Cuando vuelva la señal podrás guardar; lo que escribiste sigue acá.</span>
+        </p>
+      }
+
+      @if (errorGeneral(); as mensaje) {
+        <p class="aviso aviso--error" role="alert">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>{{ mensaje }}</span>
+        </p>
+      }
+
+      <footer class="modal__pie">
+        <button type="button" class="boton boton--neutro" (click)="cerrar.emit()">Cancelar</button>
+        <button type="submit" class="boton boton--primario" [disabled]="guardando() || sinConexion()">
+          @if (guardando()) {
+            Guardando…
+          } @else {
+            {{ esEdicion() ? 'Guardar cambios' : 'Crear cuenta' }}
+          }
+        </button>
+      </footer>
+    </form>
+  </div>
+</div>

@@ -42,6 +42,7 @@ class Usuario extends Authenticatable
     {
         return [
             'activo' => 'boolean',
+            'created_at' => 'datetime',
         ];
     }
 
@@ -80,5 +81,39 @@ class Usuario extends Authenticatable
     public function documentosSubidos(): HasMany
     {
         return $this->hasMany(Documento::class, 'subido_por');
+    }
+
+    /**
+     * ¿Ya hizo algo como profesor/estudiante? Profesor: tiene
+     * asignaciones. Estudiante: tiene matrículas. Es lo que pinta la
+     * etiqueta "Sin asignaciones/matrícula todavía" del módulo Usuarios.
+     *
+     * Lee los conteos que carga UsuarioService::consulta() -- sin ellos,
+     * devuelve false para todos.
+     */
+    public function tieneVinculoAcademico(): bool
+    {
+        return $this->rol?->nombre === 'profesor'
+            ? ($this->profesor?->asignaciones_count ?? 0) > 0
+            : ($this->estudiante?->matriculas_count ?? 0) > 0;
+    }
+
+    /**
+     * ¿Hay alguna fila que apunte a esta cuenta? Si la hay, Postgres no la
+     * deja borrar (las FK no tienen `on delete cascade` a propósito) y lo
+     * que corresponde es desactivarla. Mismos conteos que el método de
+     * arriba.
+     */
+    public function tieneDatosAsociados(): bool
+    {
+        return $this->tieneVinculoAcademico()
+            || (
+                ($this->profesor?->excepciones_plazo_count ?? 0)
+                + ($this->estudiante?->notas_count ?? 0)
+                + ($this->estudiante?->documentos_count ?? 0)
+                + ($this->estudiante?->acudientes_count ?? 0)
+                + ($this->notas_registradas_count ?? 0)
+                + ($this->documentos_subidos_count ?? 0)
+            ) > 0;
     }
 }

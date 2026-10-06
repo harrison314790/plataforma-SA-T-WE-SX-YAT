@@ -102,8 +102,7 @@ export const routes: Routes = [
         path: 'usuarios',
         canActivate: [tienePermisoGuard('vista_admin_usuarios')],
         title: 'Usuarios · Sistema Académico',
-        data: { modulo: 'Usuarios' },
-        loadComponent: enConstruccion,
+        loadChildren: () => import('./features/usuarios/usuarios.routes').then((m) => m.USUARIOS_ROUTES),
       },
       {
         path: 'documentos',

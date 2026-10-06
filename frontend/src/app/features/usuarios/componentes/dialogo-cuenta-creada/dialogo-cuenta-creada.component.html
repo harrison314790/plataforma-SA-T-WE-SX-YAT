@@ -1,0 +1,62 @@
+<!-- Sin `(click)` en el velo y sin `(cerrarModal)`: ver el docblock del
+     componente. `appModal` se queda por el foco y la trampa de Tab. -->
+<div class="modal modal--usuarios modal--centrado" role="presentation">
+  <div
+    class="modal__panel cuenta-creada"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="titulo-creada"
+    aria-describedby="advertencia-creada"
+    appModal
+  >
+    <div class="cuenta-creada__encabezado">
+      <span class="cuenta-creada__sello" aria-hidden="true">
+        <app-icono nombre="visto" [tamano]="22" />
+      </span>
+      <div>
+        <h2 class="cuenta-creada__titulo" id="titulo-creada">Cuenta creada</h2>
+        <p class="cuenta-creada__quien">
+          {{ cuenta().nombreCompleto }} ya puede iniciar sesión como
+          {{ cuenta().tipo === 'profesor' ? 'profesor' : 'estudiante' }}.
+        </p>
+      </div>
+    </div>
+
+    <dl class="cuenta-creada__datos">
+      <dt>Usuario</dt>
+      <dd>{{ cuenta().email }}</dd>
+    </dl>
+
+    <div class="cuenta-creada__campo">
+      <label class="cuenta-creada__rotulo" for="contrasena-creada">Contraseña inicial</label>
+      <span class="cuenta-creada__fila">
+        <input
+          #campo
+          id="contrasena-creada"
+          class="cuenta-creada__contrasena"
+          readonly
+          [value]="contrasena()"
+          (focus)="seleccionar(campo)"
+        />
+        <button
+          type="button"
+          class="cuenta-creada__copiar"
+          [class.cuenta-creada__copiar--hecho]="copiada()"
+          (click)="copiar(campo)"
+        >
+          <span aria-hidden="true">{{ copiada() ? '✓' : '⧉' }}</span>
+          <span aria-live="polite">{{ copiada() ? 'Copiada' : 'Copiar' }}</span>
+        </button>
+      </span>
+    </div>
+
+    <div class="cuenta-creada__advertencia" id="advertencia-creada">
+      <span class="cuenta-creada__alerta" aria-hidden="true">!</span>
+      <span><strong>Guárdala y entrégasela en persona</strong> — no podrás volver a verla.</span>
+    </div>
+
+    <button type="button" class="boton boton--primario cuenta-creada__cerrar" (click)="cerrar.emit()">
+      Entendido, cerrar
+    </button>
+  </div>
+</div>

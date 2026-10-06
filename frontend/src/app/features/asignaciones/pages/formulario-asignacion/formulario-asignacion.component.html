@@ -32,7 +32,11 @@
       </button>
     </header>
 
-    <form class="modal__cuerpo formulario" (ngSubmit)="enviar(false)">
+    <!-- `(submit)` + preventDefault y NO `(ngSubmit)`: `ngSubmit` solo existe
+         si el componente importa FormsModule, y este no lo importa. Sin
+         FormsModule, el Enter / el botón "Guardar" disparaban el envío nativo
+         del navegador: la página se recargaba y el POST nunca salía. -->
+    <form class="modal__cuerpo formulario" novalidate (submit)="$event.preventDefault(); enviar(false)">
       <label class="campo">
         <span class="campo__rotulo">Profesor <span class="campo__obligatorio">*</span></span>
         <select
