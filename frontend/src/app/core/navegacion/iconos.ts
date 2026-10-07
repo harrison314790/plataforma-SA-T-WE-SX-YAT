@@ -139,6 +139,17 @@ export const ICONOS = {
   candado: 'M5.5 11h13v9h-13zM8.2 11V8.2a3.8 3.8 0 017.6 0V11',
   copiar: 'M9 9h10.5v10.5H9zM15 9V4.5H4.5V15H9',
   opciones: 'M5 11a1 1 0 100 2 1 1 0 000-2zM12 11a1 1 0 100 2 1 1 0 000-2zM19 11a1 1 0 100 2 1 1 0 000-2z',
+
+  /**
+   * Matrículas. `intercambiar`: dos flechas opuestas, "Cambiar de grupo".
+   * `retirar`: una flecha que sale de un marco abierto, "Retirar del
+   * año". NO se reutiliza `salir` para retirar, por lo mismo que con la
+   * equis de cerrar: `salir` es el CERRAR SESIÓN, y el mismo dibujo para
+   * "retirar a un estudiante" y "salir del sistema" confunde justo en la
+   * acción con consecuencias.
+   */
+  intercambiar: 'M4 8h13l-3-3M20 16H7l3 3',
+  retirar: 'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10',
 } as const;
 
 export type NombreDeIcono = keyof typeof ICONOS;

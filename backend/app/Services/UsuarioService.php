@@ -78,16 +78,7 @@ class UsuarioService
 
             'dominioEstudiantes' => config('usuarios.dominio_correo_estudiantes'),
 
-            'acciones' => Recurso::query()
-                ->where('modulo', 'usuarios')
-                ->where('tipo', 'boton')
-                ->orderBy('orden')
-                ->orderBy('codigo')
-                ->get()
-                ->mapWithKeys(fn (Recurso $r) => [
-                    $r->codigo => ['etiqueta' => $r->etiqueta ?? $r->codigo, 'icono' => $r->icono],
-                ])
-                ->all(),
+            'acciones' => Recurso::accionesDe('usuarios'),
         ];
     }
 

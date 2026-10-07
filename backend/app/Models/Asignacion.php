@@ -76,16 +76,16 @@ class Asignacion extends Model
     }
 
     /**
-     * Matrículas del mismo sede/grado/grupo que esta asignación, en
-     * cualquiera de los períodos de SU año -- los estudiantes que "le
-     * corresponden" a este profesor acá. Misma relación que usa la
-     * política RLS `notas_profesor_inserta_dentro_de_plazo` para validar
-     * que un estudiante es suyo.
+     * Matrículas del mismo sede/grado/grupo que esta asignación, en SU
+     * año -- los estudiantes que "le corresponden" a este profesor acá.
+     * Misma relación que usa la política RLS
+     * `notas_profesor_inserta_dentro_de_plazo` para validar que un
+     * estudiante es suyo.
      *
-     * Ya no se compara `periodo_id` directo (esta asignación no tiene uno
-     * propio desde 09-asignaciones-por-anio.sql -- cubre los 4 períodos
-     * del año) sino que se cruza `matriculas.periodo_id` contra
-     * `periodos_academicos.anio`, igual que hace la política RLS.
+     * Asignación y matrícula son las dos por año (09 y
+     * 20-matriculas-por-anio.sql), así que el cruce es `anio` contra
+     * `anio`. Incluye las retiradas: quien llama decide si las muestra
+     * (la política de inserción de notas sí exige `estado = 'activa'`).
      *
      * `grupo` es parte de la comparación a propósito, no un descuido: desde
      * que `grado`/`grupo` se separaron en columnas propias
@@ -98,6 +98,6 @@ class Asignacion extends Model
         return Matricula::where('sede_id', $this->sede_id)
             ->where('grado', $this->grado)
             ->where('grupo', $this->grupo)
-            ->whereHas('periodo', fn ($q) => $q->where('anio', $this->anio));
+            ->where('anio', $this->anio);
     }
 }

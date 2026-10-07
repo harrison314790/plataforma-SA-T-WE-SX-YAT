@@ -60,4 +60,39 @@ class Recurso extends Model
     {
         return $query->where('tipo', 'vista');
     }
+
+    /**
+     * El rótulo y el ícono de los botones de un módulo, tal como los
+     * define esta tabla: la pantalla los lee de su `/opciones` en vez de
+     * tenerlos escritos en el HTML. Nació en AsignacionService; con
+     * Usuarios y Matrículas pidiendo lo mismo, vive acá una sola vez.
+     *
+     * NO filtra por permiso, y es deliberado: esto es el CATÁLOGO de
+     * acciones, no lo que esta persona puede hacer. Quién ve qué lo
+     * resuelve `*appHasRole` con el mapa de permisos que ya llegó en el
+     * login, sin que este endpoint tenga que repetir esa lógica (y poder
+     * desincronizarse de ella).
+     *
+     * @return array<string, array{etiqueta: string, icono: string|null}>
+     */
+    public static function accionesDe(string $modulo): array
+    {
+        return static::query()
+            ->where('modulo', $modulo)
+            ->where('tipo', 'boton')
+            ->orderBy('orden')
+            ->orderBy('codigo')
+            ->get()
+            ->mapWithKeys(fn (Recurso $r) => [
+                $r->codigo => [
+                    // El respaldo no es decorativo: `etiqueta` es nullable
+                    // en el esquema (solo las vistas la tienen obligatoria
+                    // por `check`), así que un botón sembrado sin rótulo
+                    // mostraría su código crudo en vez de romperse.
+                    'etiqueta' => $r->etiqueta ?? $r->codigo,
+                    'icono' => $r->icono,
+                ],
+            ])
+            ->all();
+    }
 }

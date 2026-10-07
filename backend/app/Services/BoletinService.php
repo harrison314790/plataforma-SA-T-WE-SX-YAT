@@ -76,7 +76,7 @@ class BoletinService
         return Matricula::query()
             ->with('estudiante.usuario')
             ->where('sede_id', $sedeId)->where('grado', $grado)->where('grupo', $grupo)
-            ->whereHas('periodo', fn ($q) => $q->where('anio', $anio))
+            ->where('anio', $anio)
             ->get()
             ->unique('estudiante_id')
             ->filter(fn (Matricula $m) => $m->estudiante?->usuario !== null)
@@ -99,12 +99,11 @@ class BoletinService
      */
     public function aniosDe(Estudiante $estudiante): array
     {
-        return Matricula::query()
-            ->with('sede')
-            ->join('periodos_academicos as per', 'per.id', '=', 'matriculas.periodo_id')
-            ->where('matriculas.estudiante_id', $estudiante->id)
-            ->orderByDesc('per.anio')->orderByDesc('per.numero')
-            ->select('matriculas.*', 'per.anio', 'per.activo as periodo_activo')
+        // Hay un período activo ese año: el boletín sigue abierto.
+        $aniosEnCurso = PeriodoAcademico::query()->where('activo', true)->pluck('anio')
+            ->map(fn ($a) => (int) $a)->all();
+
+        return $this->matriculasDe($estudiante)
             ->get()
             ->groupBy('anio')
             ->map(fn (Collection $delAnio) => [
@@ -112,22 +111,30 @@ class BoletinService
                 'grado' => (int) $delAnio->first()->grado,
                 'grupo' => $delAnio->first()->grupo,
                 'sede' => $delAnio->first()->sede?->nombre,
-                // Hay un período activo ese año: el boletín sigue abierto.
-                'enCurso' => $delAnio->contains(fn ($m) => (bool) $m->periodo_activo),
+                'enCurso' => in_array((int) $delAnio->first()->anio, $aniosEnCurso, true),
             ])
             ->values()->all();
     }
 
+    /**
+     * Las matrículas de un estudiante, la que vale primero dentro de cada
+     * año: una matrícula es por año (20-matriculas-por-anio.sql), pero
+     * quien se retiró y volvió tiene dos ese año -- vale la activa, y
+     * entre retiradas, la más reciente.
+     */
+    private function matriculasDe(Estudiante $estudiante)
+    {
+        return Matricula::query()
+            ->with('sede')
+            ->where('estudiante_id', $estudiante->id)
+            ->orderByDesc('anio')
+            ->orderByRaw("estado = 'activa' desc")
+            ->orderByDesc('fecha_matricula');
+    }
+
     public function boletin(Estudiante $estudiante, int $anio): array
     {
-        $matricula = Matricula::query()
-            ->with('sede')
-            ->join('periodos_academicos as per', 'per.id', '=', 'matriculas.periodo_id')
-            ->where('matriculas.estudiante_id', $estudiante->id)
-            ->where('per.anio', $anio)
-            ->orderByDesc('per.numero')
-            ->select('matriculas.*')
-            ->first();
+        $matricula = $this->matriculasDe($estudiante)->where('anio', $anio)->first();
 
         if ($matricula === null) {
             throw new ErrorDeNegocio("No hay matrícula de este estudiante en {$anio}, así que no hay boletín que mostrar.");

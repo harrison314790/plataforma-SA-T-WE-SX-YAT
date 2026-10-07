@@ -13,6 +13,12 @@
   genéricas (.boton, .campo, .modal...) se reescriben solo adentro de
   este módulo.
 
+  MATRÍCULAS REUTILIZA ESTE ARCHIVO: su mockup es de la misma familia, así
+  que su página va dentro de `.usuarios-pagina` y sus modales llevan
+  `.modal--usuarios`. Cambiar algo acá cambia las dos pantallas -- es lo
+  que se quiere mientras sigan siendo el mismo diseño. Lo propio de
+  Matrículas está en matriculas.css.
+
   Colores: los del sistema (styles.css) donde el mockup coincide con un
   token. Los grises intermedios y los dos tonos de borde que el mockup usa
   y el sistema no tiene se declaran UNA vez acá abajo como variables

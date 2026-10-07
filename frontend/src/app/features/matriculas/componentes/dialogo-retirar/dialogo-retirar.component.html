@@ -1,0 +1,77 @@
+<div class="modal modal--usuarios modal--centrado" role="presentation" (click)="cerrar.emit()">
+  <div
+    class="modal__panel confirmacion confirmacion--matricula"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="titulo-retirar"
+    appModal
+    (click)="$event.stopPropagation()"
+    (cerrarModal)="cerrar.emit()"
+  >
+    <h2 class="confirmacion__titulo" id="titulo-retirar">¿Retirar a {{ nombre() }} del año {{ matricula().anio }}?</h2>
+
+    <!-- Nunca pedir una confirmación sin mostrar sobre qué. -->
+    <div class="confirmacion__ficha">
+      <span class="confirmacion__nombre">{{ nombre() }}</span>
+      <span class="confirmacion__secundario">
+        <span class="celda-curso">{{ curso(matricula().grado, matricula().grupo) }}</span>
+        · {{ sede() }} · matriculado el {{ fechaCorta(matricula().fecha) }}
+      </span>
+    </div>
+
+    <div class="campo">
+      <label class="campo__rotulo" for="rt-motivo">Motivo <span class="campo__obligatorio" aria-hidden="true">*</span></label>
+      <select
+        id="rt-motivo"
+        class="campo__control"
+        [class.campo__control--error]="errores()['motivo']"
+        (change)="motivo.set($any($event.target).value); errores.set({})"
+      >
+        <option value="" [selected]="!motivo()">Elige el motivo</option>
+        @for (m of motivos(); track m) {
+          <option [value]="m" [selected]="m === motivo()">{{ m }}</option>
+        }
+      </select>
+      @if (errores()['motivo']; as e) {
+        <span class="campo__error" role="alert">✕ {{ e }}</span>
+      }
+    </div>
+
+    @if (motivo() === 'Otro') {
+      <div class="campo">
+        <label class="campo__rotulo" for="rt-detalle">¿Cuál? <span class="campo__obligatorio" aria-hidden="true">*</span></label>
+        <input
+          id="rt-detalle"
+          class="campo__control"
+          [class.campo__control--error]="errores()['detalle']"
+          autocomplete="off"
+          placeholder="Ej.: enfermedad prolongada"
+          maxlength="200"
+          [value]="detalle()"
+          (input)="detalle.set($any($event.target).value); errores.set({})"
+        />
+        @if (errores()['detalle']; as e) {
+          <span class="campo__error" role="alert">✕ {{ e }}</span>
+        }
+      </div>
+    }
+
+    <p class="confirmacion__texto confirmacion__texto--chico">
+      Sus notas ya registradas se conservan. La matrícula no se borra: queda como “Retirada”.
+    </p>
+
+    @if (errorGeneral(); as m) {
+      <p class="aviso aviso--error" role="alert">
+        <app-icono nombre="alerta" [tamano]="16" />
+        <span>{{ m }}</span>
+      </p>
+    }
+
+    <div class="confirmacion__botones">
+      <button type="button" class="boton boton--neutro" (click)="cerrar.emit()">Cancelar</button>
+      <button type="button" class="boton boton--peligro" [disabled]="guardando()" (click)="retirar()">
+        {{ guardando() ? 'Retirando…' : 'Retirar del año' }}
+      </button>
+    </div>
+  </div>
+</div>

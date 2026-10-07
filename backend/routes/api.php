@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AsignacionController;
 use App\Http\Controllers\Api\V1\AutenticacionController;
 use App\Http\Controllers\Api\V1\BoletinController;
+use App\Http\Controllers\Api\V1\MatriculaController;
 use App\Http\Controllers\Api\V1\NavegacionController;
 use App\Http\Controllers\Api\V1\NotaController;
 use App\Http\Controllers\Api\V1\NudoPedagogicoController;
@@ -223,8 +224,41 @@ Route::prefix('v1')->group(function () {
                     ->middleware('requiere.permiso:btn_eliminar_usuario');
             });
 
+        /*
+         * MATRÍCULAS -- un estudiante en una sede+grado+grupo por AÑO
+         * (20-matriculas-por-anio.sql).
+         *
+         * Mismo esquema que asignaciones y usuarios: `vista_matriculas`
+         * es la puerta de todo el grupo y cada acción tiene su `btn_*`.
+         * Agregar un acudiente va con `btn_matricular_estudiante`: se
+         * hace desde el formulario de matricular, no es una acción suelta.
+         *
+         * No hay DELETE: una matrícula se retira (queda 'retirada' con su
+         * motivo), nunca se borra -- tampoco hay política RLS de delete.
+         */
+        Route::prefix('matriculas')
+            ->middleware('requiere.permiso:vista_matriculas')
+            ->group(function () {
+                Route::get('/opciones', [MatriculaController::class, 'opciones']);
+                Route::get('/', [MatriculaController::class, 'index']);
+
+                Route::middleware('requiere.permiso:btn_matricular_estudiante')->group(function () {
+                    Route::post('/', [MatriculaController::class, 'store']);
+                    Route::post('/lote', [MatriculaController::class, 'lote']);
+                    Route::post('/acudientes', [MatriculaController::class, 'agregarAcudiente']);
+                });
+
+                Route::patch('/{matricula}/grupo', [MatriculaController::class, 'cambiarGrupo'])
+                    ->whereUuid('matricula')
+                    ->middleware('requiere.permiso:btn_cambiar_grupo');
+
+                Route::patch('/{matricula}/retiro', [MatriculaController::class, 'retirar'])
+                    ->whereUuid('matricula')
+                    ->middleware('requiere.permiso:btn_retirar_matricula');
+            });
+
         // Los próximos módulos (sedes, asignaturas, períodos,
-        // matrículas, recursos/permisos) van acá, con el mismo patrón:
+        // recursos/permisos) van acá, con el mismo patrón:
         // dentro de este grupo 'auth.rls', y con
         // 'requiere.permiso:codigo' o 'requiere.superadmin' según
         // corresponda -- ver permisos.md para qué código usa cada uno.

@@ -33,12 +33,8 @@ class PeriodoAcademico extends Model
     // período" dejó de ser una relación 1:N bien definida -- las mismas
     // asignaciones son compartidas por los 4 períodos de su año. Ver
     // Asignacion::matriculasCorrespondientes() para el cruce real
-    // (por `anio`, no por `periodo_id`).
-
-    public function matriculas(): HasMany
-    {
-        return $this->hasMany(Matricula::class, 'periodo_id');
-    }
+    // (por `anio`, no por `periodo_id`). Tampoco hay matriculas(): desde
+    // 20-matriculas-por-anio.sql la matrícula también es por año.
 
     public function excepcionesPlazo(): HasMany
     {

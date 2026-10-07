@@ -1,0 +1,58 @@
+<div class="modal modal--usuarios modal--centrado" role="presentation" (click)="cerrar.emit()">
+  <div
+    class="modal__panel confirmacion confirmacion--matricula"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="titulo-cambiar-grupo"
+    appModal
+    (click)="$event.stopPropagation()"
+    (cerrarModal)="cerrar.emit()"
+  >
+    <div>
+      <h2 class="confirmacion__titulo" id="titulo-cambiar-grupo">Cambiar de grupo</h2>
+      <p class="confirmacion__subtitulo">
+        {{ nombre() }} · ahora en <span class="celda-curso">{{ curso(matricula().grado, matricula().grupo) }}</span>,
+        {{ catalogo().nombreSede(matricula().sedeId) }}
+      </p>
+    </div>
+
+    <div class="formulario-cambio">
+      <label class="campo">
+        <span class="campo__rotulo">Sede</span>
+        <select class="campo__control" (change)="elegirSede($any($event.target).value)">
+          @for (s of sedes(); track s.id) {
+            <option [value]="s.id" [selected]="s.id === sedeId()">{{ s.nombre }}</option>
+          }
+        </select>
+      </label>
+      <label class="campo">
+        <span class="campo__rotulo">Grupo de {{ matricula().grado }}°</span>
+        <select
+          class="campo__control"
+          [class.campo__control--error]="error()"
+          [disabled]="grupos().length === 0"
+          (change)="elegirGrupo($any($event.target).value)"
+        >
+          <option value="" [selected]="!grupo()">Elige</option>
+          @for (g of grupos(); track g) {
+            <option [value]="g" [selected]="g === grupo()">{{ rotuloGrupo(g) }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    @if (error(); as m) {
+      <span class="campo__error" role="alert">✕ {{ m }}</span>
+    } @else if (sinOpciones()) {
+      <span class="campo__ayuda campo__ayuda--fuerte">{{ sinOpciones() }}</span>
+    }
+    <span class="campo__ayuda">El grado no cambia. Sus notas siguen con él en el grupo nuevo.</span>
+
+    <div class="confirmacion__botones">
+      <button type="button" class="boton boton--neutro" (click)="cerrar.emit()">Cancelar</button>
+      <button type="button" class="boton boton--primario" [disabled]="guardando()" (click)="guardar()">
+        {{ guardando() ? 'Guardando…' : 'Guardar cambio' }}
+      </button>
+    </div>
+  </div>
+</div>

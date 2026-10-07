@@ -25,6 +25,7 @@ export const RUTAS_CONSTRUIDAS: ReadonlySet<string> = new Set([
   '/porcentajes',
   '/boletines',
   '/usuarios',
+  '/matriculas',
 ]);
 
 export function estaConstruida(ruta: string | null | undefined): boolean {

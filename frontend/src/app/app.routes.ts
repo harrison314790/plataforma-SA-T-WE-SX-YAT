@@ -88,8 +88,7 @@ export const routes: Routes = [
         path: 'matriculas',
         canActivate: [tienePermisoGuard('vista_matriculas')],
         title: 'Matrículas · Sistema Académico',
-        data: { modulo: 'Matrículas' },
-        loadComponent: enConstruccion,
+        loadChildren: () => import('./features/matriculas/matriculas.routes').then((m) => m.MATRICULAS_ROUTES),
       },
       {
         path: 'asistencia',

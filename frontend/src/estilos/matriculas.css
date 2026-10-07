@@ -1,0 +1,1275 @@
+/*
+  ═══════════════════════════════════════════════════════════
+  MÓDULO DE MATRÍCULAS (features/matriculas)
+
+  Calcado del mockup aprobado ("Matrículas - Módulo admin.html"), que es
+  de la MISMA familia que el de Usuarios: mismos radios, alturas de
+  control, tarjeta blanca sobre gris, banner, pestañas, buscador,
+  segmentado, menú de fila y modales. Todo eso ya vive en usuarios.css y
+  se reutiliza tal cual: la página va dentro de `.usuarios-pagina` y los
+  modales llevan `.modal--usuarios` (que también traen las variables
+  locales `--u-*`).
+
+  Acá solo está lo que Usuarios no tiene: el resumen de cifras, la
+  casilla de selección, la barra de lote, las filas de curso plegables,
+  el buscador de estudiante del formulario y las notas de los modales.
+
+  Colores: los del sistema. Turquesa = interacción y selección. Verde =
+  aprobó/activa. Amarillo = pendiente/provisional. Rojo = no aprobó o
+  error. El morado no aparece (es de la marca). Nunca color solo: cada
+  estado lleva ícono y palabra.
+  ═══════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────────
+   CABECERA
+   ─────────────────────────────────────────────────────────── */
+
+.matriculas {
+  max-width: 1240px;
+}
+
+/* Deja aire abajo para que la barra de lote no tape la última fila. */
+.matriculas--con-barra {
+  padding-bottom: 120px;
+}
+
+.matriculas__acciones {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.matriculas__acciones .boton--primario {
+  flex: none;
+  font-size: 15px;
+  box-shadow: 0 1px 2px rgba(14, 129, 126, 0.25);
+}
+
+.selector-anio-matricula {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.selector-anio-matricula__caja {
+  position: relative;
+  display: block;
+  width: 116px;
+}
+
+/* La flecha del select dibujada, igual en todos los navegadores. */
+.selector-anio-matricula__caja::after,
+.filtro-matriculas::after {
+  content: '▾';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: var(--texto-secundario);
+  pointer-events: none;
+}
+
+.selector-anio-matricula__control,
+.filtro-matriculas__control {
+  width: 100%;
+  height: 42px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--u-gris-borde-campo);
+  border-radius: 8px;
+  background: var(--superficie);
+  font-family: var(--fuente-ui);
+  font-size: 15px;
+  color: var(--texto-principal);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.selector-anio-matricula__control {
+  font: 600 15px/1 var(--fuente-datos);
+}
+
+.selector-anio-matricula__control:focus-visible,
+.filtro-matriculas__control:focus-visible {
+  border-color: var(--accion-700);
+}
+
+.filtro-matriculas__control:disabled {
+  border-color: var(--u-gris-input-lectura);
+  background: #F4F4F5;
+  cursor: not-allowed;
+}
+
+.filtro-matriculas__control--dato {
+  font: 500 15px/1 var(--fuente-datos);
+}
+
+/* ───────────────────────────────────────────────────────────
+   ESTADOS
+   ─────────────────────────────────────────────────────────── */
+
+.matriculas__esqueleto .usuarios__esqueleto-fila {
+  height: 58px;
+  animation: matriculas-latir 1.4s ease-in-out infinite;
+}
+
+@keyframes matriculas-latir {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.matriculas__esqueleto-casilla {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #EBEBEC;
+}
+
+.matriculas__esqueleto-barra-suave {
+  background: var(--u-gris-suave);
+}
+
+.matriculas__vacio-ok {
+  width: 56px;
+  height: 56px;
+  background: var(--aprobado-050);
+  color: var(--aprobado-900);
+}
+
+.matriculas__vacio-cero {
+  font: 600 18px/1 var(--fuente-datos);
+}
+
+.matriculas__sin-coincidencias {
+  padding: 44px 20px;
+}
+
+.usuarios-pagina .boton--neutro-borde {
+  padding: 0 16px;
+  border: 1px solid var(--u-gris-borde-campo);
+  background: var(--superficie);
+  color: var(--texto-principal);
+  font-weight: 500;
+}
+
+.usuarios-pagina .boton--neutro-borde:hover:not(:disabled) {
+  background: var(--u-fondo-pagina);
+}
+
+/* "Cancelar" de la barra de lote y del pie del formulario: sin borde. */
+.usuarios-pagina .boton--fantasma-gris,
+.modal--usuarios .boton--fantasma-gris {
+  padding: 0 14px;
+  background: transparent;
+  color: var(--texto-principal);
+  font-weight: 500;
+}
+
+.usuarios-pagina .boton--fantasma-gris:hover:not(:disabled),
+.modal--usuarios .boton--fantasma-gris:hover:not(:disabled) {
+  background: var(--u-gris-suave);
+}
+
+/* ───────────────────────────────────────────────────────────
+   RESUMEN DE CIFRAS (filtran la tabla al pulsarlas)
+   ─────────────────────────────────────────────────────────── */
+
+.resumen-matriculas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  padding: 16px 20px 4px;
+}
+
+.resumen-matriculas__dato {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: var(--superficie);
+  font-family: var(--fuente-ui);
+  text-align: left;
+  color: var(--texto-principal);
+  cursor: pointer;
+  transition: box-shadow 0.12s;
+}
+
+.resumen-matriculas__dato:hover {
+  border-color: var(--accion-700);
+}
+
+/* Elegida: borde turquesa doble y fondo apenas teñido -- forma y color. */
+.resumen-matriculas__dato--elegido {
+  border-color: var(--accion-700);
+  background: #F3FCFB;
+  box-shadow: inset 0 0 0 1px var(--accion-700);
+}
+
+.resumen-matriculas__rotulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--u-gris-oscuro);
+}
+
+.resumen-matriculas__icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.resumen-matriculas__icono[data-tono='pendiente'] { background: var(--pendiente-100); color: var(--pendiente-texto); }
+.resumen-matriculas__icono[data-tono='ok'] { background: var(--aprobado-050); color: var(--aprobado-900); }
+.resumen-matriculas__icono[data-tono='error'] { background: var(--reprobado-050); color: var(--reprobado-700); }
+.resumen-matriculas__icono[data-tono='neutro'] { background: var(--u-gris-suave); color: var(--texto-secundario); }
+
+.resumen-matriculas__numero {
+  font: 600 28px/1 var(--fuente-datos);
+}
+
+.resumen-matriculas__sub {
+  font-size: 13px;
+  color: var(--texto-secundario);
+}
+
+/* ───────────────────────────────────────────────────────────
+   FILTROS
+   ─────────────────────────────────────────────────────────── */
+
+.matriculas__filtros {
+  gap: 10px;
+}
+
+.matriculas__filtros .buscador {
+  max-width: 330px;
+  flex-basis: 240px;
+}
+
+.matriculas__buscador-corto.buscador {
+  max-width: 300px;
+  flex-basis: 220px;
+}
+
+.filtro-matriculas {
+  position: relative;
+  flex: 0 1 190px;
+}
+
+.filtro-matriculas--ancho { flex-basis: 200px; }
+.filtro-matriculas--corto { flex-basis: 140px; }
+
+.matriculas__filtros .usuarios__conteo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.boton-enlace {
+  padding: 4px;
+  border: 0;
+  background: none;
+  font-family: var(--fuente-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accion-700);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.boton-enlace:hover {
+  color: var(--accion-900);
+}
+
+.boton-enlace--chico {
+  padding: 0;
+  font-size: 13px;
+}
+
+.nota-graduados {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 20px 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: var(--u-fondo-pagina);
+  font-size: 14px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   TABLAS
+   ─────────────────────────────────────────────────────────── */
+
+.matriculas__tabla .tabla {
+  min-width: 1120px;
+}
+
+.matriculas__tabla .tabla tbody td,
+.matriculas__tabla .tabla tbody th {
+  height: 62px;
+}
+
+.matriculas__col-casilla {
+  width: 44px;
+}
+
+.matriculas__col-accion {
+  width: 124px;
+  text-align: right;
+}
+
+.matriculas__col-menu {
+  width: 56px;
+}
+
+/* La acción de la fila queda fija a la derecha: la tabla es más ancha
+   que la pantalla en un portátil, y "Matricular" no puede quedar fuera
+   de vista detrás de un scroll horizontal. */
+.matriculas__tabla .tabla .matriculas__col-accion,
+.matriculas__tabla .tabla .matriculas__col-menu {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  box-shadow: -8px 0 8px -8px rgba(26, 26, 26, 0.12);
+}
+
+.matriculas__tabla .tabla thead .matriculas__col-accion,
+.matriculas__tabla .tabla thead .matriculas__col-menu {
+  z-index: 2;
+}
+
+.matriculas__fila--marcada td,
+.matriculas__fila--marcada th {
+  background: #F3FCFB !important;
+}
+
+/* Casilla de selección: botón con role=checkbox (tres estados). */
+.casilla {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--u-gris-borde-campo);
+  border-radius: 6px;
+  background: var(--superficie);
+  font: 700 13px/1 var(--fuente-ui);
+  color: var(--superficie);
+  cursor: pointer;
+}
+
+.casilla--marcada {
+  border-color: var(--accion-700);
+  background: var(--accion-700);
+}
+
+.casilla:disabled {
+  border-color: var(--u-gris-input-lectura);
+  background: #F4F4F5;
+  cursor: not-allowed;
+}
+
+.celda-doble {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 14px;
+}
+
+.celda-doble__dato {
+  font: 500 13px/1.2 var(--fuente-datos);
+  color: var(--texto-secundario);
+}
+
+.celda-doble__sub {
+  font-size: 12px;
+  color: var(--texto-secundario);
+}
+
+/* Resultado del año: ícono + texto sobre fondo suave. */
+.chip-resultado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip-resultado--chico {
+  min-height: 22px;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+.chip-resultado__icono {
+  font-size: 12px;
+}
+
+.chip-resultado[data-clase='aprobo'] { background: var(--aprobado-050); color: var(--aprobado-900); }
+.chip-resultado[data-clase='reprobo'] { background: var(--reprobado-050); color: var(--reprobado-700); }
+.chip-resultado[data-clase='progreso'] { background: var(--pendiente-100); color: var(--texto-principal); }
+.chip-resultado[data-clase='progreso'] .chip-resultado__icono { color: var(--pendiente-texto); }
+.chip-resultado[data-clase='retirado'] { background: var(--u-gris-suave); color: var(--texto-secundario); }
+
+.celda-sugerencia {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.celda-sugerencia__curso {
+  font: 600 15px/1.2 var(--fuente-datos);
+}
+
+.celda-sugerencia__tipo {
+  font-size: 12px;
+  color: var(--texto-secundario);
+}
+
+.insignia-cambio {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--u-pendiente-borde);
+  border-radius: 999px;
+  background: var(--pendiente-050);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto-principal);
+}
+
+.celda-vacia-suave {
+  font-size: 13px;
+  color: var(--texto-secundario);
+}
+
+.celda-curso {
+  font: 600 14px/1.2 var(--fuente-datos);
+  color: var(--texto-principal);
+}
+
+.celda-fecha {
+  font: 400 13px/1.2 var(--fuente-datos);
+  color: var(--u-gris-oscuro);
+  white-space: nowrap;
+}
+
+.celda-persona__detalle {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--texto-secundario);
+  white-space: normal;
+}
+
+.boton-fila {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--accion-700);
+  border-radius: 8px;
+  background: var(--superficie);
+  font-family: var(--fuente-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accion-700);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.boton-fila:hover:not(:disabled) {
+  background: var(--accion-050);
+}
+
+.boton-fila:disabled {
+  border-color: var(--u-gris-input-lectura);
+  color: #8A8A8A;
+  cursor: not-allowed;
+}
+
+/* ── Fila de curso plegable (pestaña Matriculados) ── */
+
+.matriculas__tabla .tabla tbody .fila-curso th {
+  height: auto;
+  padding: 0 !important;
+  background: var(--u-fondo-pagina);
+  border-bottom: 1px solid #E8E8E8;
+}
+
+.fila-curso__boton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 20px;
+  border: 0;
+  background: transparent;
+  font-family: var(--fuente-ui);
+  font-size: 14px;
+  font-weight: 400;
+  text-align: left;
+  color: var(--texto-principal);
+  cursor: pointer;
+}
+
+.fila-curso__boton:hover {
+  background: #F0F0F1;
+}
+
+.fila-curso__flecha {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #E0E0E0;
+  border-radius: 6px;
+  background: var(--superficie);
+  font-size: 13px;
+  color: var(--u-gris-oscuro);
+  transition: transform 0.15s;
+}
+
+.fila-curso__flecha--abierta {
+  transform: rotate(90deg);
+}
+
+.fila-curso__curso {
+  font: 600 15px/1 var(--fuente-datos);
+}
+
+.fila-curso__punto {
+  color: #8A8A8A;
+}
+
+.fila-curso__sede {
+  font-weight: 500;
+}
+
+.fila-curso__retiradas {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid #E0E0E0;
+  border-radius: 999px;
+  background: var(--superficie);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto-secundario);
+}
+
+/* ───────────────────────────────────────────────────────────
+   BARRA DE LOTE (fija abajo, sobre el contenido)
+   ─────────────────────────────────────────────────────────── */
+
+@keyframes matriculas-subir {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.barra-lote {
+  position: fixed;
+  left: var(--barra-ancho);
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  padding: 0 20px 16px;
+  pointer-events: none;
+}
+
+.shell--barra-colapsada .barra-lote {
+  left: var(--barra-ancho-colapsada);
+}
+
+.barra-lote__panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 1176px;
+  min-height: 0;
+  padding: 12px 16px;
+  border: 1px solid #D4D4D4;
+  border-radius: 12px;
+  background: var(--superficie);
+  box-shadow: 0 10px 30px rgba(26, 26, 26, 0.16);
+  pointer-events: auto;
+  animation: matriculas-subir 0.18s ease-out;
+}
+
+.barra-lote__conteo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--accion-100);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accion-900);
+  white-space: nowrap;
+}
+
+.barra-lote__rotulo {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.barra-lote__sede { flex: 0 1 190px; min-width: 150px; }
+.barra-lote__grado { flex: 0 0 92px; }
+.barra-lote__grupo { flex: 0 0 120px; }
+
+.barra-lote .filtro-matriculas__control {
+  font-size: 14px;
+}
+
+.barra-lote__mensaje {
+  flex: 1 1 200px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--u-gris-oscuro);
+}
+
+.barra-lote__mensaje--error {
+  color: var(--reprobado-700);
+}
+
+.barra-lote__botones {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.barra-lote__botones .boton--primario {
+  font-size: 15px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   MENÚ DE FILA
+   ─────────────────────────────────────────────────────────── */
+
+.menu-opciones--matriculas {
+  width: 230px;
+}
+
+.menu-opciones__nota {
+  margin: 0;
+  padding: 6px 10px 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--texto-secundario);
+}
+
+/* ───────────────────────────────────────────────────────────
+   MODALES
+   ─────────────────────────────────────────────────────────── */
+
+.modal--matricula .modal__panel {
+  max-width: 620px;
+}
+
+/* Cuerpo con scroll propio y pie fijo abajo (el cuerpo no es un <form>,
+   así que no le alcanza la regla de usuarios.css). */
+.modal--matricula .modal__cuerpo {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  gap: 18px;
+  padding: 20px 24px;
+}
+
+.modal--matricula .modal__pie {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 16px 24px;
+  border-top: 1px solid var(--u-gris-linea);
+}
+
+.formulario-matricula__pie-acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modal--usuarios .campo__opcional {
+  font-weight: 400;
+  color: var(--texto-secundario);
+}
+
+.modal--usuarios .campo__ayuda--fuerte {
+  color: var(--u-gris-oscuro);
+}
+
+/* ── Notas dentro de un modal: ícono en círculo + texto ── */
+
+.nota-modal {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: var(--u-fondo-pagina);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.nota-modal strong {
+  font-weight: 600;
+}
+
+.nota-modal__icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.nota-modal__icono--neutro {
+  border: 1px solid #8A8A8A;
+  background: var(--superficie);
+  color: var(--u-gris-oscuro);
+}
+
+.nota-modal__icono--plano {
+  border: 0 !important;
+  background: none !important;
+  font-size: 15px;
+}
+
+.nota-modal--ok {
+  border-color: var(--u-activo-borde);
+  background: var(--aprobado-050);
+}
+
+.nota-modal--ok .nota-modal__icono {
+  background: var(--aprobado-700);
+  color: var(--superficie);
+}
+
+.nota-modal--pendiente {
+  border-color: var(--u-pendiente-borde);
+  background: var(--pendiente-050);
+}
+
+.nota-modal--pendiente .nota-modal__icono {
+  border: 1px solid var(--pendiente-texto);
+  background: var(--pendiente-relleno);
+  color: var(--texto-principal);
+}
+
+.nota-modal--error {
+  border-color: var(--reprobado-100);
+  background: var(--reprobado-050);
+}
+
+.nota-modal--error .nota-modal__icono {
+  background: var(--reprobado-700);
+  color: var(--superficie);
+}
+
+/* ── Buscador de estudiante (combobox) ── */
+
+.combo {
+  position: relative;
+}
+
+.combo app-icono {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--texto-secundario);
+  pointer-events: none;
+}
+
+.modal--usuarios .combo__campo {
+  padding-left: 40px;
+}
+
+/* `fixed` y posicionada desde el campo: dentro del cuerpo con scroll del
+   modal, una lista `absolute` quedaría recortada. */
+.combo__lista {
+  position: fixed;
+  z-index: 60;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: var(--superficie);
+  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.12);
+}
+
+.combo__opcion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.combo__opcion--resaltada {
+  background: var(--accion-050);
+}
+
+.combo__textos {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.combo__nombre {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.combo__documento {
+  font: 500 12px/1.3 var(--fuente-datos);
+  color: var(--texto-secundario);
+}
+
+.combo__estado {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--u-gris-oscuro);
+  white-space: nowrap;
+}
+
+.combo__mas,
+.combo__nada {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--texto-secundario);
+}
+
+.combo__nada {
+  font-size: 14px;
+}
+
+.avatar--chico {
+  width: 30px;
+  height: 30px;
+  margin-right: 0;
+  font-size: 11px;
+}
+
+.avatar--ficha {
+  width: 40px;
+  height: 40px;
+  margin-right: 0;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  font-size: 14px;
+}
+
+.formulario-matricula__pie-campo {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.enlace-modal {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accion-700);
+  text-underline-offset: 3px;
+}
+
+.enlace-modal:hover {
+  color: var(--accion-900);
+}
+
+/* ── Ficha del estudiante elegido ── */
+
+.ficha-estudiante {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--u-gris-linea);
+  border-radius: 10px;
+  background: var(--fondo-solo-lectura);
+  animation: matriculas-subir 0.15s ease-out;
+}
+
+.ficha-estudiante__cabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ficha-estudiante__textos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ficha-estudiante__nombre {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ficha-estudiante__documento {
+  font: 500 13px/1.3 var(--fuente-datos);
+  color: var(--texto-secundario);
+}
+
+.ficha-estudiante__datos {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.ficha-estudiante__datos dt {
+  color: var(--texto-secundario);
+}
+
+.ficha-estudiante__datos dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ── Año, sede, grado, grupo ── */
+
+.formulario-matricula__anio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.formulario-matricula__anio-rotulo {
+  font-weight: 600;
+}
+
+.formulario-matricula__anio-valor {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: #F4F4F5;
+  font: 600 14px/1 var(--fuente-datos);
+}
+
+.formulario-matricula__curso {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.formulario-matricula__rotulo-grado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.insignia-sugerido--en-linea {
+  position: static;
+  transform: none;
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.formulario-matricula__explicaciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: -6px;
+}
+
+.formulario-matricula__razon {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--u-gris-oscuro);
+}
+
+/* ── Acudiente ── */
+
+.formulario-matricula__fila-acudiente {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.boton-suave {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accion-100);
+  font-family: var(--fuente-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accion-900);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.boton-suave span {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.boton-suave:hover {
+  background: #B9F0EE;
+}
+
+.modal--usuarios .formulario-matricula__ok {
+  color: var(--aprobado-900);
+}
+
+.acudiente-nuevo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: var(--fondo-solo-lectura);
+  animation: matriculas-subir 0.15s ease-out;
+}
+
+.acudiente-nuevo__titulo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.acudiente-nuevo__parentesco {
+  display: flex;
+  gap: 8px;
+}
+
+.opcion-parentesco {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 42px;
+  border: 1px solid var(--u-gris-borde-campo);
+  border-radius: 8px;
+  background: var(--superficie);
+  font-family: var(--fuente-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--texto-principal);
+  cursor: pointer;
+}
+
+.opcion-parentesco--elegida {
+  border-color: var(--accion-700);
+  background: var(--accion-050);
+  color: var(--accion-900);
+}
+
+.opcion-parentesco:disabled {
+  border-color: var(--borde);
+  background: #F4F4F5;
+  color: #8A8A8A;
+  cursor: not-allowed;
+}
+
+.acudiente-nuevo .formulario__par {
+  gap: 12px;
+}
+
+.acudiente-nuevo .campo__control {
+  background: var(--superficie);
+}
+
+.acudiente-nuevo__botones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal--usuarios .acudiente-nuevo__botones .boton {
+  height: 40px;
+}
+
+/* ── Confirmaciones (retirar, cambiar grupo, lote) ── */
+
+.modal--usuarios .confirmacion--matricula {
+  max-width: 500px;
+  gap: 16px;
+}
+
+.modal--usuarios .confirmacion--lote {
+  max-width: 540px;
+  max-height: 100%;
+  gap: 12px;
+  overflow: auto;
+}
+
+.confirmacion__subtitulo {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--texto-secundario);
+}
+
+.confirmacion__texto strong {
+  font-weight: 700;
+}
+
+.confirmacion__texto--chico {
+  font-size: 14px;
+  color: var(--u-gris-oscuro);
+}
+
+.lista-lote {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--u-gris-linea);
+  border-radius: 10px;
+}
+
+.lista-lote__fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.formulario-cambio {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   MÓVIL
+   ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .matriculas__acciones {
+    width: 100%;
+  }
+
+  .matriculas__acciones .boton {
+    flex: 1;
+  }
+
+  .resumen-matriculas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 12px 16px 4px;
+  }
+
+  .filtro-matriculas,
+  .filtro-matriculas--ancho,
+  .filtro-matriculas--corto {
+    flex: 1 1 45%;
+  }
+
+  .barra-lote {
+    left: 0;
+    padding: 0 8px 8px;
+  }
+
+  .barra-lote__botones {
+    width: 100%;
+  }
+
+  .barra-lote__botones .boton {
+    flex: 1;
+  }
+
+  .formulario-matricula__curso,
+  .formulario-cambio {
+    grid-template-columns: 1fr;
+  }
+
+  .modal--matricula .modal__cuerpo,
+  .modal--matricula .modal__pie {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .formulario-matricula__pie-acciones,
+  .formulario-matricula__pie-acciones .boton {
+    width: 100%;
+  }
+}
+
+.ficha-estudiante__parentesco {
+  font-weight: 400;
+  color: var(--texto-secundario);
+}

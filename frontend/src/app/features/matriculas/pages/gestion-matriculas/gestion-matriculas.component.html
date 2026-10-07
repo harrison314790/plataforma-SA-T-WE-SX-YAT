@@ -1,0 +1,652 @@
+<!--
+  Mismo lenguaje visual que Usuarios (los dos salen de la misma familia de
+  mockups): por eso la página va dentro de `.usuarios-pagina` y reutiliza
+  sus piezas (.banner, .pestanas, .buscador, .segmentado, .avatar,
+  .menu-opciones...). Lo propio de Matrículas está en estilos/matriculas.css.
+-->
+@if (sinPermiso()) {
+  <app-sin-permiso />
+} @else {
+  <div class="usuarios-pagina">
+  <section class="usuarios matriculas" [class.matriculas--con-barra]="barraLoteAbierta()">
+    <header class="usuarios__cabecera">
+      <div class="usuarios__titulos">
+        <h1 class="usuarios__titulo">Matrículas</h1>
+        <p class="usuarios__ayuda">
+          Ubica a cada estudiante en una sede, grado y grupo para el año escolar. Sin matrícula no
+          aparece en listas, no recibe notas ni tiene boletín.
+        </p>
+      </div>
+
+      <div class="matriculas__acciones">
+        <label class="selector-anio-matricula">
+          Año escolar
+          <span class="selector-anio-matricula__caja">
+            <select
+              class="selector-anio-matricula__control"
+              [value]="anio()"
+              [disabled]="opciones() === null"
+              (change)="elegirAnio($any($event.target).value)"
+            >
+              @for (a of opciones()?.anios ?? []; track a) {
+                <option [value]="a" [selected]="a === anio()">{{ a }}</option>
+              }
+            </select>
+          </span>
+        </label>
+
+        <!-- Capa 1: oculta el botón. Laravel verifica el mismo código
+             (`requiere.permiso:btn_matricular_estudiante`) y RLS respalda
+             el insert (`matriculas_admin_gestiona`). -->
+        <button
+          *appHasRole="'btn_matricular_estudiante'"
+          type="button"
+          class="boton boton--primario"
+          [disabled]="!enLinea() || cargando() || datos() === null"
+          [title]="enLinea() ? '' : 'Sin conexión: no se puede matricular ahora'"
+          (click)="abrirFormulario(null)"
+        >
+          <span class="boton__mas" aria-hidden="true">+</span>
+          {{ accion('btn_matricular_estudiante').etiqueta }}
+        </button>
+      </div>
+    </header>
+
+    @if (aviso(); as a) {
+      <div class="banner" [class.banner--ok]="a.tipo === 'ok'" role="status">
+        <span class="banner__icono" aria-hidden="true">{{ a.tipo === 'ok' ? '✓' : '–' }}</span>
+        <span class="banner__texto">{{ a.texto }}</span>
+        <button type="button" class="banner__cerrar" aria-label="Cerrar aviso" (click)="cerrarAviso()">×</button>
+      </div>
+    }
+
+    <div class="usuarios__tarjeta">
+      <div class="pestanas" role="tablist" aria-label="Vista">
+        <button
+          type="button" role="tab" class="pestana"
+          [class.pestana--activa]="pestana() === 'pm'"
+          [attr.aria-selected]="pestana() === 'pm'"
+          (click)="elegirPestana('pm')"
+        >
+          <span>Por matricular</span>
+          <span class="pestana__conteo">{{ cargando() ? '…' : conteoPestanas().pm }}</span>
+        </button>
+        <button
+          type="button" role="tab" class="pestana"
+          [class.pestana--activa]="pestana() === 'mt'"
+          [attr.aria-selected]="pestana() === 'mt'"
+          (click)="elegirPestana('mt')"
+        >
+          <span>Matriculados</span>
+          <span class="pestana__conteo">{{ cargando() ? '…' : conteoPestanas().mt }}</span>
+        </button>
+      </div>
+
+      @if (cargando()) {
+        <div class="usuarios__esqueleto matriculas__esqueleto" aria-busy="true" aria-label="Cargando">
+          @for (anchos of anchosEsqueleto; track $index) {
+            <div class="usuarios__esqueleto-fila">
+              <span class="matriculas__esqueleto-casilla"></span>
+              <span class="usuarios__esqueleto-avatar"></span>
+              <span class="usuarios__esqueleto-barra" [style.width]="anchos[0]"></span>
+              <span class="usuarios__esqueleto-barra matriculas__esqueleto-barra-suave" [style.width]="anchos[1]"></span>
+            </div>
+          }
+        </div>
+      } @else if (error() !== null) {
+        <div class="usuarios__error" role="alert">
+          <span class="usuarios__error-icono" aria-hidden="true">✕</span>
+          <h2>No pudimos cargar {{ pestana() === 'pm' ? 'los estudiantes por matricular' : 'las matrículas' }}</h2>
+          <p>{{ error() }}</p>
+          <button type="button" class="boton boton--primario" (click)="cargar()">Reintentar</button>
+        </div>
+      } @else if (pestana() === 'pm') {
+        <!-- ═══════════════ PESTAÑA "POR MATRICULAR" ═══════════════ -->
+        @if (pendientes().length === 0 && !vistaGraduados()) {
+          <div class="usuarios__vacio">
+            <span class="usuarios__vacio-icono matriculas__vacio-ok" aria-hidden="true">
+              <app-icono nombre="visto" [tamano]="26" />
+            </span>
+            @if (graduados().length === 0 && conteoPestanas().mt === 0) {
+              <h2>No hay estudiantes de {{ anio()! - 1 }} para pasar a {{ anio() }}</h2>
+              <p>Nadie tuvo matrícula el año anterior. Matricula a cada estudiante con “{{ accion('btn_matricular_estudiante').etiqueta }}”.</p>
+            } @else {
+              <h2>Todos los estudiantes de {{ anio()! - 1 }} ya están matriculados en {{ anio() }}</h2>
+              <p>
+                No queda nadie pendiente.
+                @if (graduados().length) { Los {{ plural(graduados().length, 'graduado', 'graduados') }} de 11° no se matriculan. }
+              </p>
+            }
+            <div class="usuarios__vacio-acciones">
+              @if (graduados().length) {
+                <button type="button" class="boton boton--neutro-borde" (click)="elegirKpi({ resultado: '', vista: 'graduados' })">
+                  Ver graduados ({{ graduados().length }})
+                </button>
+              }
+              <button type="button" class="boton boton--secundario" (click)="elegirPestana('mt')">Ver matriculados</button>
+            </div>
+          </div>
+        } @else {
+          <div class="resumen-matriculas" role="group" aria-label="Resumen">
+            @for (k of kpis(); track k.clave) {
+              <button
+                type="button"
+                class="resumen-matriculas__dato"
+                [class.resumen-matriculas__dato--elegido]="k.elegido"
+                [attr.aria-pressed]="k.elegido"
+                (click)="elegirKpi(k.filtros)"
+              >
+                <span class="resumen-matriculas__rotulo">
+                  <span class="resumen-matriculas__icono" [attr.data-tono]="k.tono" aria-hidden="true">{{ k.icono }}</span>
+                  {{ k.rotulo }}
+                </span>
+                <span class="resumen-matriculas__numero">{{ k.n }}</span>
+                <span class="resumen-matriculas__sub">{{ k.sub }}</span>
+              </button>
+            }
+          </div>
+
+          <div class="usuarios__filtros matriculas__filtros" role="search">
+            <label class="buscador">
+              <span class="tabla__leyenda">Buscar por nombre o documento</span>
+              <app-icono nombre="lupa" [tamano]="18" />
+              <input
+                type="search" class="buscador__campo" autocomplete="off"
+                placeholder="Buscar por nombre o documento"
+                [value]="f1().q"
+                (input)="filtrarF1({ q: $any($event.target).value })"
+              />
+            </label>
+
+            <label class="filtro-matriculas">
+              <span class="tabla__leyenda">Sede anterior</span>
+              <select class="filtro-matriculas__control" (change)="filtrarF1({ sede: $any($event.target).value })">
+                <option value="" [selected]="f1().sede === ''">Todas las sedes</option>
+                @for (s of opciones()?.sedes ?? []; track s.id) {
+                  <option [value]="s.id" [selected]="f1().sede === '' + s.id">{{ s.nombre }}</option>
+                }
+              </select>
+            </label>
+
+            <label class="filtro-matriculas">
+              <span class="tabla__leyenda">Grado anterior</span>
+              <select class="filtro-matriculas__control" (change)="filtrarF1({ gradoGrupo: $any($event.target).value })">
+                <option value="" [selected]="f1().gradoGrupo === ''">Todos los grados</option>
+                @for (o of opcionesGradoAnterior(); track o.valor) {
+                  <option [value]="o.valor" [selected]="f1().gradoGrupo === o.valor">{{ o.rotulo }}</option>
+                }
+              </select>
+            </label>
+
+            @if (!vistaGraduados()) {
+              <label class="filtro-matriculas filtro-matriculas--ancho">
+                <span class="tabla__leyenda">Resultado del año</span>
+                <select class="filtro-matriculas__control" (change)="filtrarF1({ resultado: $any($event.target).value })">
+                  <option value="" [selected]="f1().resultado === ''">Todos los resultados</option>
+                  <option value="A" [selected]="f1().resultado === 'A'">✓ Aprobó</option>
+                  <option value="N" [selected]="f1().resultado === 'N'">✕ No aprobó</option>
+                  <option value="P" [selected]="f1().resultado === 'P'">● En progreso</option>
+                </select>
+              </label>
+            }
+
+            <span class="usuarios__conteo" aria-live="polite">
+              {{ plural(filasPendientes().length, 'estudiante', 'estudiantes') }}
+              @if (hayFiltrosF1()) {
+                <button type="button" class="boton-enlace" (click)="limpiarF1()">Quitar filtros</button>
+              }
+            </span>
+          </div>
+
+          @if (vistaGraduados()) {
+            <div class="nota-graduados">
+              <span>
+                {{ plural(graduados().length, 'estudiante aprobó', 'estudiantes aprobaron') }} 11° en {{ anio()! - 1 }}.
+                No cuentan como pendientes y no se matriculan.
+              </span>
+              <button type="button" class="boton-enlace" (click)="elegirKpi({ resultado: '', vista: 'pendientes' })">
+                Volver a Por matricular
+              </button>
+            </div>
+          }
+
+          <div class="tabla-contenedor usuarios__tabla matriculas__tabla">
+            <table class="tabla">
+              <caption class="tabla__leyenda">Estudiantes de {{ anio()! - 1 }} sin matrícula en {{ anio() }}</caption>
+              <thead>
+                <tr>
+                  <th scope="col" class="matriculas__col-casilla">
+                    <!-- Seleccionar los visibles. `role=checkbox` con
+                         aria-checked mixed: tres estados, no dos. -->
+                    <button
+                      type="button" role="checkbox" class="casilla"
+                      [class.casilla--marcada]="estadoSeleccionTodos() !== 'false'"
+                      [attr.aria-checked]="estadoSeleccionTodos()"
+                      aria-label="Seleccionar todos los visibles"
+                      [disabled]="vistaGraduados() || filasPendientes().length === 0"
+                      (click)="alternarTodos()"
+                    >{{ estadoSeleccionTodos() === 'true' ? '✓' : estadoSeleccionTodos() === 'mixed' ? '–' : '' }}</button>
+                  </th>
+                  <th scope="col">Nombre completo</th>
+                  <th scope="col">Documento</th>
+                  <th scope="col">De dónde viene</th>
+                  <th scope="col">Resultado del año</th>
+                  <th scope="col">Grado para {{ anio() }}</th>
+                  <th scope="col" class="matriculas__col-accion">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of filasPendientes(); track p.estudiante.id) {
+                  @let marcada = seleccion().has(p.estudiante.id);
+                  @let graduado = p.sugerencia.tipo === 'graduado';
+                  <tr
+                    [class.tabla__fila--resaltada]="resaltadas().has(p.estudiante.id)"
+                    [class.matriculas__fila--marcada]="marcada"
+                  >
+                    <td class="matriculas__col-casilla">
+                      <button
+                        type="button" role="checkbox" class="casilla"
+                        [class.casilla--marcada]="marcada"
+                        [attr.aria-checked]="marcada"
+                        [attr.aria-label]="'Seleccionar a ' + p.estudiante.nombres + ' ' + p.estudiante.apellidos"
+                        [disabled]="graduado"
+                        (click)="alternarSeleccion(p.estudiante.id)"
+                      >{{ marcada ? '✓' : '' }}</button>
+                    </td>
+                    <th scope="row" class="celda-persona">
+                      <span class="avatar" aria-hidden="true">{{ iniciales(p.estudiante.nombres, p.estudiante.apellidos) }}</span>
+                      <span class="celda-persona__textos">
+                        <span class="celda-persona__nombre">{{ p.estudiante.nombres }} {{ p.estudiante.apellidos }}</span>
+                      </span>
+                    </th>
+                    <td class="tabla__celda-numerica">{{ p.estudiante.documento }}</td>
+                    <td>
+                      <span class="celda-doble">
+                        <span>{{ catalogo()?.nombreSede(p.anterior.sedeId) }}</span>
+                        <span class="celda-doble__dato">{{ curso(p.anterior.grado, p.anterior.grupo) }} · {{ p.anterior.anio }}</span>
+                      </span>
+                    </td>
+                    <td>
+                      @let c = chip(p);
+                      <span class="chip-resultado" [attr.data-clase]="c.clase">
+                        <span class="chip-resultado__icono" aria-hidden="true">{{ c.icono }}</span>{{ c.texto }}
+                      </span>
+                    </td>
+                    <td>
+                      @if (graduado) {
+                        <span class="chip-estado chip-estado--inactivo"><span aria-hidden="true">–</span>Graduado</span>
+                      } @else {
+                        <span class="celda-sugerencia">
+                          <span class="celda-sugerencia__curso">{{ curso(p.sugerencia.grado!, p.sugerencia.grupo || '?') }}</span>
+                          <span class="celda-sugerencia__tipo">{{ textoSugerencia(p.sugerencia) }}</span>
+                        </span>
+                        @if (p.sugerencia.cambiaDeSede) {
+                          <span
+                            class="insignia-cambio"
+                            [title]="catalogo()?.nombreSede(p.anterior.sedeId) + ' no tiene ' + p.sugerencia.grado + '°; se sugiere ' + catalogo()?.nombreSede(p.sugerencia.sedeId)"
+                          ><span aria-hidden="true">↗</span>Cambia de sede</span>
+                        }
+                      }
+                    </td>
+                    <td class="matriculas__col-accion">
+                      @if (graduado) {
+                        <span class="celda-vacia-suave">No se matricula</span>
+                      } @else {
+                        <button
+                          *appHasRole="'btn_matricular_estudiante'"
+                          type="button"
+                          class="boton-fila"
+                          [disabled]="!enLinea()"
+                          [title]="enLinea() ? '' : 'Sin conexión: no se puede matricular ahora'"
+                          [attr.aria-label]="'Matricular a ' + p.estudiante.nombres + ' ' + p.estudiante.apellidos"
+                          (click)="abrirFormulario(p.estudiante.id)"
+                        >Matricular</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+
+            @if (filasPendientes().length === 0) {
+              <div class="usuarios__vacio matriculas__sin-coincidencias">
+                <h2>Ningún estudiante coincide con estos filtros</h2>
+                <p>Revisa cómo está escrito o quita algún filtro.</p>
+                <button type="button" class="boton boton--secundario" (click)="limpiarF1()">Quitar filtros</button>
+              </div>
+            }
+          </div>
+        }
+      } @else {
+        <!-- ═══════════════ PESTAÑA "MATRICULADOS" ═══════════════ -->
+        @if (conteoPestanas().mt === 0 && conteoEstados().retirada === 0 && !hayFiltrosF2()) {
+          <div class="usuarios__vacio">
+            <span class="usuarios__vacio-icono matriculas__vacio-cero" aria-hidden="true">0</span>
+            <h2>Aún no hay matrículas en {{ anio() }}</h2>
+            <p>Empieza por la pestaña “Por matricular”: ahí están los estudiantes del año anterior, con el grado sugerido.</p>
+            <div class="usuarios__vacio-acciones">
+              <button type="button" class="boton boton--primario" (click)="elegirPestana('pm')">Ir a Por matricular</button>
+            </div>
+          </div>
+        } @else {
+          <div class="usuarios__filtros matriculas__filtros" role="search">
+            <label class="buscador matriculas__buscador-corto">
+              <span class="tabla__leyenda">Buscar por nombre o documento</span>
+              <app-icono nombre="lupa" [tamano]="18" />
+              <input
+                type="search" class="buscador__campo" autocomplete="off"
+                placeholder="Buscar por nombre o documento"
+                [value]="f2().q"
+                (input)="filtrarF2({ q: $any($event.target).value })"
+              />
+            </label>
+
+            <label class="filtro-matriculas">
+              <span class="tabla__leyenda">Sede</span>
+              <select class="filtro-matriculas__control" (change)="filtrarF2({ sede: $any($event.target).value })">
+                <option value="" [selected]="f2().sede === ''">Todas las sedes</option>
+                @for (s of opciones()?.sedes ?? []; track s.id) {
+                  <option [value]="s.id" [selected]="f2().sede === '' + s.id">{{ s.nombre }}</option>
+                }
+              </select>
+            </label>
+
+            <label class="filtro-matriculas filtro-matriculas--corto">
+              <span class="tabla__leyenda">Grado</span>
+              <select class="filtro-matriculas__control" (change)="filtrarF2({ grado: $any($event.target).value })">
+                <option value="" [selected]="f2().grado === ''">Todo grado</option>
+                @for (g of opcionesGrado(); track g) {
+                  <option [value]="g" [selected]="f2().grado === '' + g">{{ g }}°</option>
+                }
+              </select>
+            </label>
+
+            <label class="filtro-matriculas filtro-matriculas--corto">
+              <span class="tabla__leyenda">Grupo</span>
+              <select class="filtro-matriculas__control" (change)="filtrarF2({ grupo: $any($event.target).value })">
+                <option value="" [selected]="f2().grupo === ''">Todo grupo</option>
+                @for (g of opcionesGrupo(); track g) {
+                  <option [value]="g" [selected]="f2().grupo === g">{{ rotuloGrupo(g) }}</option>
+                }
+              </select>
+            </label>
+
+            <div class="segmentado" role="radiogroup" aria-label="Estado">
+              @for (e of estados; track e.valor) {
+                <button
+                  type="button" role="radio" class="segmentado__opcion"
+                  [class.segmentado__opcion--activa]="f2().estado === e.valor"
+                  [attr.aria-checked]="f2().estado === e.valor"
+                  (click)="filtrarF2({ estado: e.valor })"
+                >
+                  {{ e.rotulo }}
+                  <span class="segmentado__conteo">{{ conteoEstados()[e.valor] }}</span>
+                </button>
+              }
+            </div>
+
+            <span class="usuarios__conteo">
+              <span aria-live="polite">
+                {{ plural(totalFilasF2(), 'matrícula', 'matrículas') }} · {{ plural(grupos().length, 'grupo', 'grupos') }}
+              </span>
+              @if (hayFiltrosF2()) {
+                <button type="button" class="boton-enlace" (click)="limpiarF2()">Quitar filtros</button>
+              }
+              @if (grupos().length) {
+                <button type="button" class="boton-enlace" (click)="alternarTodosLosGrupos()">
+                  {{ todosPlegados() ? 'Desplegar todos' : 'Plegar todos' }}
+                </button>
+              }
+            </span>
+          </div>
+
+          <div class="tabla-contenedor usuarios__tabla matriculas__tabla">
+            <table class="tabla">
+              <caption class="tabla__leyenda">Matrículas de {{ anio() }}, agrupadas por curso</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Nombre completo</th>
+                  <th scope="col">Documento</th>
+                  <th scope="col">Sede</th>
+                  <th scope="col">Grado-grupo</th>
+                  <th scope="col">Fecha</th>
+                  <th scope="col">Acudiente que matriculó</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col" class="matriculas__col-menu"><span class="tabla__leyenda">Más opciones</span></th>
+                </tr>
+              </thead>
+              @for (g of grupos(); track g.clave) {
+                @let abierto = !plegados().has(g.clave);
+                <tbody>
+                  <tr class="fila-curso">
+                    <th colspan="8" scope="rowgroup">
+                      <button type="button" class="fila-curso__boton" [attr.aria-expanded]="abierto" (click)="alternarGrupo(g.clave)">
+                        <span class="fila-curso__flecha" [class.fila-curso__flecha--abierta]="abierto" aria-hidden="true">›</span>
+                        <span class="fila-curso__curso">{{ g.curso }}</span>
+                        <span class="fila-curso__punto" aria-hidden="true">·</span>
+                        <span class="fila-curso__sede">{{ g.sede }}</span>
+                        <span class="fila-curso__punto" aria-hidden="true">·</span>
+                        <span>{{ plural(g.activas, 'estudiante', 'estudiantes') }}</span>
+                        @if (g.retiradas) {
+                          <span class="fila-curso__retiradas"><span aria-hidden="true">–</span>{{ plural(g.retiradas, 'retirada', 'retiradas') }}</span>
+                        }
+                      </button>
+                    </th>
+                  </tr>
+                  @if (abierto) {
+                    @for (f of g.filas; track f.m.id) {
+                      @let activa = f.m.estado === 'activa';
+                      <tr
+                        [class.tabla__fila--resaltada]="resaltadas().has(f.m.id)"
+                        [class.tabla__fila--menu]="menu()?.id === f.m.id"
+                      >
+                        <th scope="row" class="celda-persona" [class.celda-persona--inactiva]="!activa">
+                          <span class="avatar" aria-hidden="true">{{ iniciales(f.e.nombres, f.e.apellidos) }}</span>
+                          <span class="celda-persona__textos">
+                            <span class="celda-persona__nombre">{{ f.e.nombres }} {{ f.e.apellidos }}</span>
+                            @if (!activa) {
+                              <span class="celda-persona__detalle">Retirada el {{ fechaCorta(f.m.fechaRetiro) }} · {{ motivoLegible(f.m) }}</span>
+                            }
+                          </span>
+                        </th>
+                        <td class="tabla__celda-numerica">{{ f.e.documento }}</td>
+                        <td class="tabla__celda-sede">{{ catalogo()?.nombreSede(f.m.sedeId) }}</td>
+                        <td class="celda-curso">{{ curso(f.m.grado, f.m.grupo) }}</td>
+                        <td class="celda-fecha">{{ fechaCorta(f.m.fecha) }}</td>
+                        <td>
+                          @if (acudienteDe(f.m); as ac) {
+                            <span class="celda-doble">
+                              <span>{{ ac.nombre }}</span>
+                              <span class="celda-doble__sub">{{ ac.parentesco | titlecase }}</span>
+                            </span>
+                          } @else {
+                            <span class="celda-vacia-suave">No registrado</span>
+                          }
+                        </td>
+                        <td>
+                          @if (activa) {
+                            <span class="chip-estado chip-estado--activo"><app-icono nombre="visto" [tamano]="12" />Activa</span>
+                          } @else {
+                            <span class="chip-estado chip-estado--inactivo"><span aria-hidden="true">–</span>Retirada</span>
+                          }
+                        </td>
+                        <td class="celda-iconos matriculas__col-menu">
+                          @if (activa) {
+                            <button
+                              type="button"
+                              class="boton-icono"
+                              [class.boton-icono--presionado]="menu()?.id === f.m.id"
+                              title="Más opciones"
+                              [attr.aria-label]="'Más opciones para ' + f.e.nombres + ' ' + f.e.apellidos"
+                              aria-haspopup="menu"
+                              [attr.aria-expanded]="menu()?.id === f.m.id"
+                              (click)="alternarMenu($event, f.m)"
+                            >
+                              <app-icono nombre="opciones" [tamano]="18" />
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  }
+                </tbody>
+              }
+            </table>
+
+            @if (grupos().length === 0) {
+              <div class="usuarios__vacio matriculas__sin-coincidencias">
+                <h2>Ninguna matrícula coincide con estos filtros</h2>
+                <div class="usuarios__vacio-acciones">
+                  <button type="button" class="boton boton--secundario" (click)="limpiarF2()">Quitar filtros</button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+    </div>
+  </section>
+  </div>
+}
+
+<!-- Barra de lote: aparece al marcar estudiantes en "Por matricular". -->
+@if (barraLoteAbierta()) {
+  @if (destinoLote(); as d) {
+    @let grupos = catalogo()?.grupos(d.sedeId, d.grado) ?? [];
+    @let sinGrupo = grupos.length === 0 || !d.grupo;
+    <div class="barra-lote" role="region" aria-label="Matricular seleccionados">
+      <div class="barra-lote__panel usuarios-pagina">
+        <span class="barra-lote__conteo"><span aria-hidden="true">✓</span>{{ plural(seleccionados().length, 'seleccionado', 'seleccionados') }}</span>
+        <span class="barra-lote__rotulo">Matricular en</span>
+
+        <label class="filtro-matriculas barra-lote__sede">
+          <span class="tabla__leyenda">Sede</span>
+          <select class="filtro-matriculas__control" (change)="cambiarDestino('sede', $any($event.target).value)">
+            @for (s of opciones()?.sedes ?? []; track s.id) {
+              <option [value]="s.id" [selected]="s.id === d.sedeId">{{ s.nombre }}</option>
+            }
+          </select>
+        </label>
+        <label class="filtro-matriculas barra-lote__grado">
+          <span class="tabla__leyenda">Grado</span>
+          <select class="filtro-matriculas__control filtro-matriculas__control--dato" (change)="cambiarDestino('grado', $any($event.target).value)">
+            @for (g of catalogo()?.grados(d.sedeId) ?? []; track g) {
+              <option [value]="g" [selected]="g === d.grado">{{ g }}°</option>
+            }
+          </select>
+        </label>
+        <label class="filtro-matriculas barra-lote__grupo">
+          <span class="tabla__leyenda">Grupo</span>
+          <select class="filtro-matriculas__control" [disabled]="grupos.length === 0" (change)="cambiarDestino('grupo', $any($event.target).value)">
+            @if (grupos.length === 0) { <option value="">Sin grupos</option> }
+            @for (g of grupos; track g) {
+              <option [value]="g" [selected]="g === d.grupo">{{ rotuloGrupo(g) }}</option>
+            }
+          </select>
+        </label>
+
+        @if (!enLinea()) {
+          <span class="barra-lote__mensaje">Sin conexión: no se puede matricular ahora.</span>
+        } @else if (grupos.length === 0) {
+          <span class="barra-lote__mensaje barra-lote__mensaje--error">
+            {{ catalogo()?.nombreSede(d.sedeId) }} no tiene grupos abiertos de {{ d.grado }}°.
+          </span>
+        }
+
+        <div class="barra-lote__botones">
+          <button type="button" class="boton boton--fantasma-gris" (click)="cancelarLote()">Cancelar</button>
+          <button
+            *appHasRole="'btn_matricular_estudiante'"
+            type="button"
+            class="boton boton--primario"
+            [disabled]="!enLinea() || sinGrupo"
+            (click)="confirmandoLote.set(true)"
+          >Matricular {{ seleccionados().length }}</button>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+<!-- Menú "Más opciones", fuera de la tabla y `position: fixed` (mismo
+     motivo que en Usuarios: el overflow del contenedor lo recortaría). -->
+@if (menu(); as m) {
+  @if (matriculaDelMenu(); as mat) {
+    <div class="menu-opciones menu-opciones--matriculas" role="menu" aria-label="Más opciones"
+      [style.top]="m.top" [style.bottom]="m.bottom" [style.right]="m.right">
+      <button
+        *appHasRole="'btn_cambiar_grupo'"
+        type="button" role="menuitem" class="menu-opciones__item"
+        [disabled]="!enLinea()"
+        (click)="abrirCambio(mat)"
+      >
+        <app-icono [nombre]="accion('btn_cambiar_grupo').icono ?? 'intercambiar'" [tamano]="16" />
+        {{ accion('btn_cambiar_grupo').etiqueta }}
+      </button>
+      <ng-container *appHasRole="'btn_retirar_matricula'">
+        <div class="menu-opciones__separador" aria-hidden="true"></div>
+        <button
+          type="button" role="menuitem" class="menu-opciones__item menu-opciones__item--peligro"
+          [disabled]="!enLinea()"
+          (click)="abrirRetiro(mat)"
+        >
+          <app-icono [nombre]="accion('btn_retirar_matricula').icono ?? 'retirar'" [tamano]="16" />
+          {{ accion('btn_retirar_matricula').etiqueta }}
+        </button>
+      </ng-container>
+      @if (!enLinea()) {
+        <p class="menu-opciones__nota">Sin conexión: vuelve a intentarlo cuando regrese la señal.</p>
+      }
+    </div>
+  }
+}
+
+@if (formulario() !== undefined) {
+  @if (datos(); as d) {
+    <app-formulario-matricula
+      [anio]="anio()!"
+      [catalogo]="catalogo()!"
+      [datos]="d"
+      [estudianteInicial]="formulario() ?? null"
+      [sinConexion]="!enLinea()"
+      (matriculada)="matriculaGuardada($event)"
+      (acudienteAgregado)="acudienteAgregado($event)"
+      (cerrar)="formularioCerrado($event)"
+    />
+  }
+}
+
+@if (confirmandoLote()) {
+  @if (destinoLote(); as d) {
+    <app-dialogo-confirmar-lote
+      [anio]="anio()!"
+      [destino]="d"
+      [pendientes]="seleccionados()"
+      [catalogo]="catalogo()!"
+      [hoy]="opciones()?.hoy ?? ''"
+      (guardado)="loteGuardado($event)"
+      (cerrar)="confirmandoLote.set(false)"
+    />
+  }
+}
+
+@if (enRetiro(); as m) {
+  <app-dialogo-retirar
+    [matricula]="m"
+    [nombre]="nombreDe(m.estudianteId)"
+    [sede]="catalogo()?.nombreSede(m.sedeId) ?? ''"
+    [motivos]="opciones()?.motivosRetiro ?? []"
+    (guardado)="retiroGuardado($event)"
+    (cerrar)="enRetiro.set(null)"
+  />
+}
+
+@if (enCambio(); as m) {
+  <app-dialogo-cambiar-grupo
+    [matricula]="m"
+    [nombre]="nombreDe(m.estudianteId)"
+    [catalogo]="catalogo()!"
+    (guardado)="cambioGuardado($event)"
+    (cerrar)="enCambio.set(null)"
+  />
+}

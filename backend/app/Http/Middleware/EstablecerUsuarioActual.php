@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 /**
  * Capa 3 de seguridad (RLS), lado Laravel: le dice a Postgres quién es el
@@ -53,7 +54,17 @@ class EstablecerUsuarioActual
             return $next($request);
         }
 
-        return DB::transaction(function () use ($request, $next, $token) {
+        // Transacción manual y no `DB::transaction(fn...)`, y no es estilo:
+        // el pipeline de rutas de Laravel atrapa las excepciones del
+        // controlador y las convierte en respuesta (422, 403...) ANTES de
+        // que vuelvan acá. `DB::transaction` nunca veía la excepción y
+        // hacía COMMIT de lo que el request alcanzó a escribir antes de
+        // fallar. Se descubrió con la matrícula en lote: el tercer
+        // estudiante fallaba con un 422 y los dos primeros quedaban
+        // matriculados. Regla: una respuesta de error no persiste nada.
+        DB::beginTransaction();
+
+        try {
             // set_config() es una función normal (acepta bind params);
             // `SET LOCAL app.usuario_id = ?` no es válido en Postgres --
             // el comando SET solo admite literales, no parámetros.
@@ -63,7 +74,18 @@ class EstablecerUsuarioActual
             // leer la fila de `usuarios`), el resto de middlewares y el
             // controlador completo -- todas sus queries de Eloquent
             // corren dentro de esta misma transacción.
-            return $next($request);
-        });
+            $respuesta = $next($request);
+        } catch (Throwable $e) {
+            DB::rollBack();
+            throw $e;
+        }
+
+        if ($respuesta->getStatusCode() >= 400) {
+            DB::rollBack();
+        } else {
+            DB::commit();
+        }
+
+        return $respuesta;
     }
 }

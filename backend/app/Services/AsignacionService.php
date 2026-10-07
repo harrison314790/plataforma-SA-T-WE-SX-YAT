@@ -199,24 +199,7 @@ class AsignacionService
      */
     private function accionesDelModulo(): array
     {
-        return Recurso::query()
-            ->where('modulo', 'asignaciones')
-            ->where('tipo', 'boton')
-            ->orderBy('orden')
-            ->orderBy('codigo')
-            ->get()
-            ->mapWithKeys(fn (Recurso $r) => [
-                $r->codigo => [
-                    // El respaldo no es decorativo: `etiqueta` es
-                    // nullable en el esquema (solo las vistas la tienen
-                    // obligatoria por `check`), así que un botón nuevo
-                    // sembrado sin rótulo mostraría su código crudo en
-                    // pantalla en vez de romperse.
-                    'etiqueta' => $r->etiqueta ?? $r->codigo,
-                    'icono' => $r->icono,
-                ],
-            ])
-            ->all();
+        return Recurso::accionesDe('asignaciones');
     }
 
     /**

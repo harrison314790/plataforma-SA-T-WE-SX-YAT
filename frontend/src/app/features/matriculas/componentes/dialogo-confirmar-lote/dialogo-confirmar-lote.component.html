@@ -1,0 +1,59 @@
+<div class="modal modal--usuarios modal--centrado" role="presentation" (click)="cerrar.emit()">
+  <div
+    class="modal__panel confirmacion confirmacion--lote"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="titulo-lote"
+    appModal
+    (click)="$event.stopPropagation()"
+    (cerrarModal)="cerrar.emit()"
+  >
+    <div>
+      <h2 class="confirmacion__titulo" id="titulo-lote">Confirmar matrícula en lote</h2>
+      <p class="confirmacion__texto">
+        Vas a matricular <strong>{{ plural(pendientes().length, 'estudiante', 'estudiantes') }}</strong> en
+        <strong>{{ curso(destino().grado, destino().grupo) }}</strong>, {{ catalogo().nombreSede(destino().sedeId) }},
+        año <strong class="celda-curso">{{ anio() }}</strong>.
+      </p>
+    </div>
+
+    <ul class="lista-lote">
+      @for (p of lista(); track p.id) {
+        <li class="lista-lote__fila">
+          <span>{{ p.nombre }}</span>
+          <span class="chip-resultado chip-resultado--chico" [attr.data-clase]="p.chip.clase">
+            <span class="chip-resultado__icono" aria-hidden="true">{{ p.chip.icono }}</span>{{ p.chip.texto }}
+          </span>
+        </li>
+      }
+    </ul>
+
+    @if (enProgreso(); as m) {
+      <div class="nota-modal nota-modal--pendiente">
+        <span class="nota-modal__icono" aria-hidden="true">!</span>
+        <span>{{ m }}</span>
+      </div>
+    }
+    @if (otraSugerencia(); as m) {
+      <div class="nota-modal nota-modal--pendiente">
+        <span class="nota-modal__icono" aria-hidden="true">!</span>
+        <span>{{ m }}</span>
+      </div>
+    }
+    <span class="campo__ayuda">En lote no se registra acudiente. La fecha de matrícula será hoy, {{ fechaCorta(hoy()) }}.</span>
+
+    @if (error(); as m) {
+      <p class="aviso aviso--error" role="alert">
+        <app-icono nombre="alerta" [tamano]="16" />
+        <span>{{ m }}</span>
+      </p>
+    }
+
+    <div class="confirmacion__botones">
+      <button type="button" class="boton boton--neutro" (click)="cerrar.emit()">Revisar selección</button>
+      <button type="button" class="boton boton--primario" [disabled]="guardando()" (click)="confirmar()">
+        {{ guardando() ? 'Matriculando…' : 'Sí, matricular ' + plural(pendientes().length, 'estudiante', 'estudiantes') }}
+      </button>
+    </div>
+  </div>
+</div>

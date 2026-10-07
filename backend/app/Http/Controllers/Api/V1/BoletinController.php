@@ -77,7 +77,13 @@ class BoletinController extends Controller
             throw new ErrorDeNegocio('Todavía no tienes matrícula registrada, así que no hay boletín que mostrar.');
         }
 
-        $anio = $request->filled('anio') ? $this->anio($request) : $anios[0]['anio'];
+        // Por defecto, el año EN CURSO y no el más reciente: desde que la
+        // matrícula es por año (20-matriculas-por-anio.sql), en enero el
+        // estudiante ya puede estar matriculado para un año que todavía
+        // no tiene períodos -- abrir ese boletín vacío escondería el del
+        // año que está terminando.
+        $porDefecto = collect($anios)->firstWhere('enCurso', true) ?? $anios[0];
+        $anio = $request->filled('anio') ? $this->anio($request) : $porDefecto['anio'];
 
         return response()->json([
             'anios' => $anios,

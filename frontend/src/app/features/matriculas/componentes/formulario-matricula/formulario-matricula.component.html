@@ -1,0 +1,340 @@
+<!--
+  Mismo armazón que el formulario de Usuarios: velo que cierra al clic,
+  `appModal` para Escape / foco / trampa de Tab, cabecera con la X, cuerpo
+  con scroll propio y pie fijo.
+-->
+<div class="modal modal--usuarios modal--matricula" role="presentation" (click)="terminar()">
+  <div
+    class="modal__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="titulo-matricula"
+    appModal
+    (click)="$event.stopPropagation()"
+    (cerrarModal)="terminar()"
+  >
+    <header class="modal__cabecera">
+      <div>
+        <h2 class="modal__titulo" id="titulo-matricula">Matricular estudiante</h2>
+        <p class="modal__subtitulo">{{ subtitulo() }}</p>
+      </div>
+      <button type="button" class="modal__cerrar" (click)="terminar()" aria-label="Cerrar">
+        <app-icono nombre="equis" [tamano]="20" />
+      </button>
+    </header>
+
+    <div class="modal__cuerpo formulario-matricula">
+      @if (ultima() && !estudiante()) {
+        <div class="nota-modal nota-modal--ok" role="status">
+          <span class="nota-modal__icono" aria-hidden="true">✓</span>
+          <span><strong>Guardada:</strong> {{ ultima() }}. Sigue con el próximo.</span>
+        </div>
+      }
+
+      @if (sinConexion()) {
+        <div class="nota-modal nota-modal--pendiente">
+          <span class="nota-modal__icono" aria-hidden="true">!</span>
+          <span>Sin conexión: puedes revisar, pero no matricular. No se guarda nada hasta que vuelva la señal.</span>
+        </div>
+      }
+
+      <!-- Estudiante: combobox sobre las cuentas que ya existen. -->
+      <div class="campo">
+        <label class="campo__rotulo" for="mm-buscar">Estudiante <span class="campo__obligatorio" aria-hidden="true">*</span></label>
+        <div class="combo">
+          <app-icono nombre="lupa" [tamano]="18" />
+          <input
+            #campoBusqueda
+            id="mm-buscar"
+            class="campo__control combo__campo"
+            [class.campo__control--error]="errores()['estudiante']"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-controls="mm-opciones"
+            [attr.aria-expanded]="listaAbierta()"
+            autocomplete="off"
+            placeholder="Escribe nombre o documento"
+            [value]="textoCampo()"
+            (focus)="alEnfocarBusqueda()"
+            (click)="alPulsarBusqueda()"
+            (input)="escribir($any($event.target).value)"
+            (blur)="cerrarListaLuego()"
+            (keydown)="teclaEnBusqueda($event)"
+          />
+        </div>
+        @if (listaAbierta()) {
+          <div
+            id="mm-opciones"
+            class="combo__lista"
+            role="listbox"
+            [style.top]="posicionLista().top"
+            [style.left]="posicionLista().left"
+            [style.width]="posicionLista().ancho"
+            [style.max-height]="posicionLista().altoMax"
+          >
+            @for (o of opcionesVisibles(); track o.e.id; let i = $index) {
+              <div
+                class="combo__opcion"
+                role="option"
+                [class.combo__opcion--resaltada]="i === resaltada()"
+                [attr.aria-selected]="o.e.id === estudianteId()"
+                (mousedown)="$event.preventDefault(); elegirEstudiante(o.e.id)"
+                (mouseenter)="resaltada.set(i)"
+              >
+                <span class="avatar avatar--chico" aria-hidden="true">{{ iniciales(o.e.nombres, o.e.apellidos) }}</span>
+                <span class="combo__textos">
+                  <span class="combo__nombre">{{ o.e.nombres }} {{ o.e.apellidos }}</span>
+                  <span class="combo__documento">{{ o.e.documento }}</span>
+                </span>
+                <span class="combo__estado">
+                  @if (o.estado.pendiente) { <span class="insignia-pendiente__punto" aria-hidden="true"></span> }
+                  {{ o.estado.texto }}
+                </span>
+              </div>
+            }
+            @if (coincidencias().length > opcionesVisibles().length) {
+              <div class="combo__mas">y {{ coincidencias().length - opcionesVisibles().length }} más · escribe más letras para acotar</div>
+            }
+            @if (coincidencias().length === 0) {
+              <div class="combo__nada">Ninguna cuenta de estudiante coincide con “{{ busqueda() }}”.</div>
+            }
+          </div>
+        }
+        <div class="formulario-matricula__pie-campo">
+          @if (errores()['estudiante']; as m) {
+            <span class="campo__error" role="alert">✕ {{ m }}</span>
+          } @else {
+            <span class="campo__ayuda">Solo aparecen cuentas de estudiante que ya existen.</span>
+          }
+          <a routerLink="/usuarios" [queryParams]="{ tipo: 'estudiante' }" class="enlace-modal" (click)="terminar()">¿No tiene cuenta? Créala en Usuarios</a>
+        </div>
+      </div>
+
+      @if (estudiante(); as e) {
+        <div class="ficha-estudiante">
+          <div class="ficha-estudiante__cabecera">
+            <span class="avatar avatar--ficha" aria-hidden="true">{{ iniciales(e.nombres, e.apellidos) }}</span>
+            <span class="ficha-estudiante__textos">
+              <span class="ficha-estudiante__nombre">{{ e.nombres }} {{ e.apellidos }}</span>
+              <span class="ficha-estudiante__documento">{{ e.documento }}</span>
+            </span>
+          </div>
+          @if (ficha(); as f) {
+            <dl class="ficha-estudiante__datos">
+              <dt>Matrícula {{ anio() - 1 }}</dt>
+              <dd>{{ f.anterior }}</dd>
+              <dt>Acudientes</dt>
+              <dd>
+                @for (a of e.acudientes; track a.id; let ultimo = $last) {
+                  {{ a.nombre }} <span class="ficha-estudiante__parentesco">({{ a.parentesco }})</span>@if (!ultimo) {, }
+                } @empty {
+                  <span class="celda-vacia-suave">Ninguno registrado</span>
+                }
+              </dd>
+              <dt>Resultado del año</dt>
+              <dd>
+                @if (f.chip; as c) {
+                  <span class="chip-resultado" [attr.data-clase]="c.clase"><span class="chip-resultado__icono" aria-hidden="true">{{ c.icono }}</span>{{ c.texto }}</span>
+                } @else {
+                  <span class="celda-vacia-suave">—</span>
+                }
+              </dd>
+            </dl>
+          }
+        </div>
+
+        @if (yaMatriculado(); as ya) {
+          <div class="nota-modal nota-modal--error" role="alert">
+            <span class="nota-modal__icono" aria-hidden="true">✕</span>
+            <span>
+              <strong>Ya está matriculado en {{ curso(ya.grado, ya.grupo) }}, {{ catalogo().nombreSede(ya.sedeId) }}.</strong>
+              No se puede matricular dos veces en {{ anio() }}. Si hay que moverlo, usa “Cambiar de grupo” en Matriculados.
+            </span>
+          </div>
+        } @else if (sugerencia()?.tipo === 'graduado') {
+          <div class="nota-modal" role="alert">
+            <span class="nota-modal__icono nota-modal__icono--neutro" aria-hidden="true">–</span>
+            <span><strong>Se graduó.</strong> Aprobó 11° en {{ anio() - 1 }}, así que ya no se matricula.</span>
+          </div>
+        } @else {
+          <div class="formulario-matricula__anio">
+            <span class="formulario-matricula__anio-rotulo">Año escolar</span>
+            <span class="formulario-matricula__anio-valor">{{ anio() }}</span>
+            <span class="campo__ayuda">Viene del selector de la página.</span>
+          </div>
+
+          <div class="formulario-matricula__curso">
+            <label class="campo">
+              <span class="campo__rotulo">Sede <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+              <select class="campo__control" [class.campo__control--error]="errores()['sede']" (change)="elegirSede($any($event.target).value)">
+                <option value="" [selected]="sedeId() === null">Elige la sede</option>
+                @for (s of catalogo().sedes; track s.id) {
+                  <option [value]="s.id" [selected]="s.id === sedeId()">{{ s.nombre }}</option>
+                }
+              </select>
+            </label>
+            <label class="campo">
+              <span class="campo__rotulo formulario-matricula__rotulo-grado">
+                <span>Grado <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+                @if (esSugerido()) { <span class="insignia-sugerido insignia-sugerido--en-linea">Sugerido</span> }
+              </span>
+              <select class="campo__control campo__control--dato" [class.campo__control--error]="errores()['grado']" [disabled]="sedeId() === null" (change)="elegirGrado($any($event.target).value)">
+                <option value="" [selected]="grado() === null">—</option>
+                @for (g of grados(); track g) {
+                  <option [value]="g" [selected]="g === grado()">{{ g }}°</option>
+                }
+              </select>
+            </label>
+            <label class="campo">
+              <span class="campo__rotulo">Grupo <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+              <select class="campo__control" [class.campo__control--error]="errores()['grupo']" [disabled]="grupos().length === 0" (change)="elegirGrupo($any($event.target).value)">
+                <option value="" [selected]="!grupo()">{{ sinGrupos() ? 'Sin grupos' : grupos().length > 1 ? 'Elige' : '—' }}</option>
+                @for (g of grupos(); track g) {
+                  <option [value]="g" [selected]="g === grupo()">{{ rotuloGrupo(g) }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <div class="formulario-matricula__explicaciones">
+            <span class="formulario-matricula__razon">{{ razon() }}</span>
+            @if (cambioLaSugerencia()) {
+              <span class="campo__ayuda">
+                Cambiaste la sugerencia ({{ textoSugerenciaOriginal() }}).
+                <button type="button" class="boton-enlace boton-enlace--chico" (click)="restaurarSugerencia()">Volver a la sugerencia</button>
+              </span>
+            }
+            @if (sugerencia()?.tipo === 'provisional') {
+              <div class="nota-modal nota-modal--pendiente">
+                <span class="nota-modal__icono" aria-hidden="true">!</span>
+                <span><strong>Todavía no tiene el resultado final del año.</strong> Puedes matricularlo igual; si al cerrar el año no aprueba, cámbialo de grupo.</span>
+              </div>
+            }
+            @if (sugerencia()?.cambiaDeSede && sugerencia(); as s) {
+              <div class="nota-modal nota-modal--pendiente">
+                <span class="nota-modal__icono nota-modal__icono--plano" aria-hidden="true">↗</span>
+                <span>{{ catalogo().nombreSede(s.anterior?.sedeId) }} no tiene {{ s.grado }}°. Por eso se sugiere {{ catalogo().nombreSede(s.sedeId) }}, que sí lo tiene.</span>
+              </div>
+            }
+            @if (sinGrupos()) {
+              <div class="nota-modal nota-modal--error" role="alert">
+                <span class="nota-modal__icono" aria-hidden="true">✕</span>
+                <span>{{ catalogo().nombreSede(sedeId()) }} no tiene grupos abiertos de {{ grado() }}°. Elige otra sede, o pide que abran el grupo en Asignaciones › Grados.</span>
+              </div>
+            } @else if (errores()['grupo'] || errores()['sede'] || errores()['grado']) {
+              <span class="campo__error" role="alert">✕ {{ errores()['sede'] || errores()['grado'] || errores()['grupo'] }}</span>
+            }
+          </div>
+
+          <!-- Acudiente que matricula (opcional). -->
+          <div class="campo">
+            <div class="formulario-matricula__fila-acudiente">
+              <label class="campo__rotulo" for="mm-acudiente">Acudiente que matricula <span class="campo__opcional">(opcional)</span></label>
+              @if (!acudienteAbierto() && parentescosLibres().length > 0 && !sinConexion()) {
+                <button type="button" class="boton-suave" (click)="abrirAcudiente()">
+                  <span aria-hidden="true">+</span>Agregar acudiente
+                </button>
+              }
+            </div>
+            <select id="mm-acudiente" class="campo__control" (change)="acudienteId.set($any($event.target).value); acMensaje.set(null)">
+              <option value="" [selected]="!acudienteId()">Sin registrar</option>
+              @for (a of e.acudientes; track a.id) {
+                <option [value]="a.id" [selected]="a.id === acudienteId()">{{ a.nombre }} · {{ a.parentesco | titlecase }}</option>
+              }
+            </select>
+            @if (acMensaje(); as m) {
+              <span class="campo__ayuda formulario-matricula__ok">✓ {{ m }}</span>
+            } @else if (parentescosLibres().length === 0) {
+              <span class="campo__ayuda">Ya tiene madre y padre registrados. Queda como constancia de quién hizo la matrícula.</span>
+            } @else {
+              <span class="campo__ayuda">Queda como constancia de quién hizo la matrícula.</span>
+            }
+
+            @if (acudienteAbierto()) {
+              <div class="acudiente-nuevo">
+                <div class="acudiente-nuevo__titulo">
+                  <span>Nuevo acudiente de {{ e.nombres }} {{ e.apellidos }}</span>
+                  <span class="campo__ayuda">Solo madre o padre</span>
+                </div>
+                <div class="acudiente-nuevo__parentesco" role="radiogroup" aria-label="Parentesco">
+                  @for (p of ['madre', 'padre']; track p) {
+                    @let libre = parentescosLibres().includes($any(p));
+                    <button
+                      type="button" role="radio" class="opcion-parentesco"
+                      [class.opcion-parentesco--elegida]="acParentesco() === p"
+                      [attr.aria-checked]="acParentesco() === p"
+                      [disabled]="!libre"
+                      [title]="libre ? '' : (p === 'madre' ? 'Ya tiene madre registrada' : 'Ya tiene padre registrado')"
+                      (click)="acParentesco.set($any(p))"
+                    ><span aria-hidden="true">{{ !libre ? '–' : acParentesco() === p ? '✓' : '' }}</span>{{ p | titlecase }}</button>
+                  }
+                </div>
+                @if (acErrores()['parentesco']; as m) { <span class="campo__error" role="alert">✕ {{ m }}</span> }
+
+                <div class="formulario__par">
+                  <label class="campo">
+                    <span class="campo__rotulo">Nombres <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+                    <input #campoAcudiente class="campo__control" [class.campo__control--error]="acErrores()['nombres']" autocomplete="off"
+                      [value]="acNombres()" (input)="acNombres.set($any($event.target).value)" (keydown.enter)="$event.preventDefault(); agregarAcudiente()" />
+                    @if (acErrores()['nombres']; as m) { <span class="campo__error" role="alert">✕ {{ m }}</span> }
+                  </label>
+                  <label class="campo">
+                    <span class="campo__rotulo">Apellidos <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+                    <input class="campo__control" [class.campo__control--error]="acErrores()['apellidos']" autocomplete="off"
+                      [value]="acApellidos()" (input)="acApellidos.set($any($event.target).value)" (keydown.enter)="$event.preventDefault(); agregarAcudiente()" />
+                    @if (acErrores()['apellidos']; as m) { <span class="campo__error" role="alert">✕ {{ m }}</span> }
+                  </label>
+                </div>
+                <div class="formulario__par">
+                  <label class="campo">
+                    <span class="campo__rotulo">Cédula <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+                    <input #campoDoc class="campo__control campo__control--dato" [class.campo__control--error]="acErrores()['documento']"
+                      inputmode="numeric" autocomplete="off" placeholder="Solo números"
+                      [value]="acDocumento()" (input)="escribirDocumento(campoDoc.value, campoDoc)" (keydown.enter)="$event.preventDefault(); agregarAcudiente()" />
+                    @if (acErrores()['documento']; as m) { <span class="campo__error" role="alert">✕ {{ m }}</span> }
+                  </label>
+                  <label class="campo">
+                    <span class="campo__rotulo">Celular <span class="campo__obligatorio" aria-hidden="true">*</span></span>
+                    <input #campoCel type="tel" class="campo__control campo__control--dato" [class.campo__control--error]="acErrores()['telefono']"
+                      inputmode="numeric" autocomplete="off" placeholder="300 123 4567"
+                      [value]="acCelular()" (input)="escribirCelular(campoCel.value, campoCel)" (keydown.enter)="$event.preventDefault(); agregarAcudiente()" />
+                    @if (acErrores()['telefono']; as m) { <span class="campo__error" role="alert">✕ {{ m }}</span> }
+                  </label>
+                </div>
+                @if (acErrores()['general'] || acErrores()['estudiante_id']; as m) {
+                  <span class="campo__error" role="alert">✕ {{ m }}</span>
+                }
+                <span class="campo__ayuda">Queda registrado en la ficha del estudiante para próximas matrículas.</span>
+                <div class="acudiente-nuevo__botones">
+                  <button type="button" class="boton boton--neutro" (click)="cerrarAcudiente()">Cancelar</button>
+                  <button type="button" class="boton boton--primario" [disabled]="acGuardando()" (click)="agregarAcudiente()">
+                    {{ acGuardando() ? 'Agregando…' : 'Agregar acudiente' }}
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+
+      @if (errorGeneral(); as m) {
+        <p class="aviso aviso--error" role="alert">
+          <app-icono nombre="alerta" [tamano]="16" />
+          <span>{{ m }}</span>
+        </p>
+      }
+    </div>
+
+    <footer class="modal__pie formulario-matricula__pie">
+      <button type="button" class="boton boton--fantasma-gris" (click)="terminar()">{{ guardadas() ? 'Terminar' : 'Cancelar' }}</button>
+      <div class="formulario-matricula__pie-acciones">
+        <button type="button" class="boton boton--secundario" [disabled]="!puedeGuardar()" (click)="guardar(true)">
+          Matricular y seguir con otro
+        </button>
+        <button type="button" class="boton boton--primario" [disabled]="!puedeGuardar()" (click)="guardar(false)">
+          {{ guardando() ? 'Guardando…' : 'Matricular' }}
+        </button>
+      </div>
+    </footer>
+  </div>
+</div>
