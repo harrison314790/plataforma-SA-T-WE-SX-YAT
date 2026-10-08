@@ -59,9 +59,57 @@ Route::prefix('v1')->group(function () {
          */
         Route::get('/navegacion/modulos', [NavegacionController::class, 'index']);
 
-        Route::get('/notas', [NotaController::class, 'index']);
-        Route::post('/notas', [NotaController::class, 'store'])
-            ->middleware('requiere.permiso:btn_registrar_nota');
+        /*
+         * NOTAS -- dos pantallas en la misma ruta /notas: "Registro de
+         * notas" (profesor) y "Seguimiento de notas" (coordinación).
+         *
+         * `vista_notas` es la puerta de todo el grupo, como en los demás
+         * módulos. Adentro:
+         *  · `accion_seguimiento_notas` -- el avance de TODAS las
+         *    asignaciones. Sin él, un profesor no puede pedir el tablero
+         *    de coordinación (RLS igual le recortaría las filas, pero el
+         *    endpoint no es para él).
+         *  · un `btn_*` por acción, separados por consecuencia: el
+         *    calendario de épocas (de él sale la época activa), abrir/
+         *    cerrar la carga, dar prórroga y corregir una nota. Ver
+         *    21-notas-modulo.sql y 22-epocas-por-fecha.sql.
+         *
+         * No hay DELETE de notas: una nota no se borra nunca, se corrige
+         * (y la corrección queda en `historial_notas`). La prórroga sí
+         * tiene DELETE en la API, pero la revoca: no borra la fila.
+         *
+         * `/seguimiento/...` y `/calendario` van antes que las rutas con
+         * parámetro, para que la palabra no se lea como un id.
+         */
+        Route::prefix('notas')
+            ->middleware('requiere.permiso:vista_notas')
+            ->group(function () {
+                Route::get('/registro', [NotaController::class, 'registro']);
+                Route::post('/lote', [NotaController::class, 'guardarLote'])
+                    ->middleware('requiere.permiso:btn_registrar_nota');
+
+                Route::middleware('requiere.permiso:accion_seguimiento_notas')->group(function () {
+                    Route::get('/seguimiento', [NotaController::class, 'seguimiento']);
+                    Route::get('/seguimiento/asignaciones/{asignacion}', [NotaController::class, 'detalleAsignacion'])
+                        ->whereUuid('asignacion');
+                });
+
+                Route::put('/calendario', [NotaController::class, 'guardarCalendario'])
+                    ->middleware('requiere.permiso:btn_editar_calendario_epocas');
+                Route::patch('/periodos/{periodo}/plazo', [NotaController::class, 'cambiarPlazo'])
+                    ->whereNumber('periodo')
+                    ->middleware('requiere.permiso:btn_controlar_plazo_notas');
+
+                Route::middleware('requiere.permiso:btn_dar_prorroga')->group(function () {
+                    Route::post('/prorrogas', [NotaController::class, 'guardarProrroga']);
+                    Route::delete('/prorrogas/{prorroga}', [NotaController::class, 'quitarProrroga'])
+                        ->whereUuid('prorroga');
+                });
+
+                Route::put('/{nota}/correccion', [NotaController::class, 'corregir'])
+                    ->whereUuid('nota')
+                    ->middleware('requiere.permiso:btn_corregir_nota');
+            });
 
         /*
          * ASIGNACIONES -- quién dicta qué, por grado, grupo y AÑO.

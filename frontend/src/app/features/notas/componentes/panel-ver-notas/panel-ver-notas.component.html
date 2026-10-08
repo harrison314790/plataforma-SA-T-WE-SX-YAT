@@ -1,0 +1,105 @@
+<div class="panel-notas" role="presentation" (mousedown)="$event.target === $event.currentTarget && cerrar.emit()">
+  <aside
+    class="panel-notas__hoja"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="dt-t"
+    appModal
+    (cerrarModal)="corrigiendo() === null && cerrar.emit()"
+  >
+    <div class="panel-notas__cabecera">
+      <div class="panel-notas__titulos">
+        <h2 id="dt-t" class="panel-notas__titulo">{{ asignacion().materia }} <span class="notas-num">{{ cabecera().curso }}</span></h2>
+        <span class="panel-notas__sub">{{ cabecera().sub }}</span>
+        <span class="panel-notas__estado">
+          <span class="chip-avance chip-avance--chico" [attr.data-estado]="cabecera().estado">
+            <span class="chip-avance__icono" aria-hidden="true">{{ cabecera().chip.icono }}</span>{{ cabecera().chip.texto }}
+          </span>
+          <span class="notas-num notas-num--fuerte">{{ cabecera().avance }}</span>
+          @if (cabecera().prorroga) {
+            <span class="texto-prorroga">+ {{ cabecera().prorroga }}</span>
+          }
+        </span>
+      </div>
+      <div class="panel-notas__botones">
+        @if (puedeProrroga()) {
+          <button
+            type="button"
+            class="boton boton--secundario boton--compacto-notas"
+            [disabled]="!enLinea()"
+            [title]="enLinea() ? '' : 'Sin conexión: no se puede cambiar ahora'"
+            (click)="darProrroga.emit()"
+          >
+            {{ cabecera().botonProrroga }}
+          </button>
+        }
+        <button type="button" class="panel-notas__cerrar" aria-label="Cerrar" (click)="cerrar.emit()">×</button>
+      </div>
+    </div>
+
+    <div class="panel-notas__cuerpo">
+      @if (cargando()) {
+        <div class="notas-esqueleto" aria-busy="true" aria-label="Cargando">
+          @for (i of [1, 2, 3, 4]; track i) {
+            <div class="notas-esqueleto__fila"><span style="width: 40%"></span><span class="notas-esqueleto__chip"></span></div>
+          }
+        </div>
+      } @else if (error() !== null) {
+        <div class="notas-estado" role="alert">
+          <span class="notas-estado__icono notas-estado__icono--error" aria-hidden="true">✕</span>
+          <p>{{ error() }}</p>
+          <button type="button" class="boton boton--primario" (click)="reintentar()">Reintentar</button>
+        </div>
+      } @else {
+        @for (f of filas(); track f.e.id) {
+          <div class="panel-notas__fila" [class.panel-notas__fila--resaltada]="f.resaltada">
+            <span class="panel-notas__estudiante">
+              <span class="panel-notas__nombre">{{ f.nombre }}</span>
+              <span class="panel-notas__registro">{{ f.registro }}</span>
+              @if (f.correccion) {
+                <span class="panel-notas__correccion">
+                  <strong>Corregida{{ f.correcciones > 1 ? ' (' + f.correcciones + ' veces)' : '' }}:</strong> {{ f.correccion }}
+                </span>
+              }
+            </span>
+            <span class="panel-notas__valor notas-num" [class.panel-notas__valor--falta]="!f.e.nota">{{ f.valor }}</span>
+            <span>
+              @if (f.desempeno; as de) {
+                <span class="chip-desempeno chip-desempeno--chico" [attr.data-tono]="de.tono">
+                  <span class="chip-desempeno__icono" aria-hidden="true">{{ de.icono }}</span>{{ de.texto }}
+                </span>
+              } @else if (!f.e.retirado && periodo().estado !== 'futuro') {
+                <span class="chip-falta"><span class="chip-falta__icono" aria-hidden="true">●</span>Falta</span>
+              }
+            </span>
+            <span class="panel-notas__accion">
+              @if (f.e.nota && puedeCorregir()) {
+                <button
+                  type="button"
+                  class="boton-fila-notas"
+                  [disabled]="!enLinea()"
+                  [title]="enLinea() ? '' : 'Sin conexión: no se puede corregir ahora'"
+                  [attr.aria-label]="'Corregir nota de ' + f.nombre"
+                  (click)="abrirCorreccion(f.e, f.e.nota)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"></path></svg>
+                  Corregir
+                </button>
+              }
+            </span>
+          </div>
+        } @empty {
+          <p class="panel-notas__vacio">Este curso no tiene estudiantes matriculados.</p>
+        }
+      }
+    </div>
+
+    <p class="panel-notas__pie">
+      Cada nota guarda quién la registró y cuándo. Las correcciones quedan con el valor anterior, el motivo y quién la hizo.
+    </p>
+  </aside>
+</div>
+
+@if (corrigiendo(); as c) {
+  <app-dialogo-corregir-nota [datos]="c" (cerrar)="corrigiendo.set(null)" (corregida)="alCorregir($event)" />
+}

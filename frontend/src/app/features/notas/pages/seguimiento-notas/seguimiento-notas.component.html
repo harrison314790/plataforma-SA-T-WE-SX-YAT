@@ -1,0 +1,549 @@
+<!--
+  "Seguimiento de notas" (coordinación). Calcado del mockup aprobado;
+  estilos en estilos/notas.css, todo bajo `.notas-pagina`.
+-->
+@if (sinPermiso()) {
+  <app-sin-permiso />
+} @else {
+  <div class="notas-pagina">
+  <section class="notas">
+    <header class="notas__cabecera">
+      <div class="notas__titulos">
+        <h1 class="notas__titulo">Seguimiento de notas</h1>
+        <p class="notas__ayuda">
+          Controla el plazo de carga y mira quién va atrasado. Una nota por estudiante, por asignación y por período.
+        </p>
+      </div>
+    </header>
+
+    @if (aviso(); as a) {
+      <div class="notas-aviso" [attr.data-tono]="a.tipo" role="status">
+        <span class="notas-aviso__icono" aria-hidden="true">{{ a.tipo === 'ok' ? '✓' : a.tipo === 'advertencia' ? '!' : '–' }}</span>
+        <span class="notas-aviso__texto">{{ a.texto }}</span>
+        <button type="button" class="notas-aviso__cerrar" aria-label="Cerrar aviso" (click)="aviso.set(null)">×</button>
+      </div>
+    }
+
+    @if (cargando()) {
+      <div class="notas-tarjeta notas-esqueleto" aria-busy="true" aria-label="Cargando">
+        <div class="notas-esqueleto__barra-superior"><span></span><span></span><span></span></div>
+        @for (anchos of anchosEsqueleto; track $index) {
+          <div class="notas-esqueleto__fila">
+            <span [style.width]="anchos[0]"></span>
+            <span class="notas-esqueleto__suave" [style.width]="anchos[1]"></span>
+            <span class="notas-esqueleto__progreso"></span>
+            <span class="notas-esqueleto__chip"></span>
+          </div>
+        }
+      </div>
+    } @else if (error() !== null) {
+      <div class="notas-tarjeta notas-estado" role="alert">
+        <span class="notas-estado__icono notas-estado__icono--error" aria-hidden="true">✕</span>
+        <h2>No pudimos cargar el avance del período</h2>
+        <p>{{ error() }} Las notas ya registradas están a salvo.</p>
+        <button type="button" class="boton boton--primario" (click)="reintentar()">Reintentar</button>
+      </div>
+    } @else if (datos()) {
+      <!-- `@if` aparte y no `@else if (datos(); as d)`: con el alias en un
+           `@else if`, el compilador de Angular 18 lo pierde después del
+           primer @if/@else anidado (NG9 "Property 'd' does not exist"). -->
+      @if (datos(); as d) {
+      <!-- ═══════════════ CALENDARIO DE ÉPOCAS ═══════════════ -->
+      <section class="notas-tarjeta" aria-labelledby="cal-t">
+        <div class="calendario__cabecera">
+          <div class="calendario__titulos">
+            <h2 id="cal-t" class="notas-tarjeta__titulo calendario__titulo">Calendario de épocas · Año escolar {{ d.periodo.anio }}</h2>
+            <span class="calendario__ayuda">La época activa cambia sola según la fecha de hoy. Haz clic en una época para ver su seguimiento.</span>
+          </div>
+          @if (puedeEditarCalendario()) {
+            <button
+              type="button"
+              class="boton boton--secundario calendario__editar"
+              [disabled]="!enLinea()"
+              [title]="enLinea() ? '' : motivoSinConexion"
+              (click)="abrirCalendario()"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M4 10h16M9 3v4M15 3v4"></path></svg>
+              Editar fechas
+            </button>
+          }
+        </div>
+        <div class="calendario__epocas" role="radiogroup" aria-label="Épocas">
+          @for (e of calendario(); track e.p.id) {
+            <button
+              type="button"
+              role="radio"
+              class="tarjeta-epoca"
+              [class.tarjeta-epoca--elegida]="e.elegida"
+              [attr.aria-checked]="e.elegida"
+              (click)="elegirEpoca(e.p.id)"
+            >
+              <span class="tarjeta-epoca__arriba">
+                <span class="tarjeta-epoca__nombres">
+                  <span class="tarjeta-epoca__nombre">{{ e.p.epoca }} Época</span>
+                  <span class="tarjeta-epoca__codigo notas-num">{{ e.p.nombre }} · {{ e.p.epocaNasa }}</span>
+                </span>
+                <span class="chip-epoca" [attr.data-estado]="e.p.estado">
+                  <span aria-hidden="true">{{ e.chip.icono }}</span>{{ e.chip.texto }}
+                </span>
+              </span>
+              <span class="tarjeta-epoca__rango notas-num">{{ e.rango }}</span>
+              <span class="tarjeta-epoca__barra" aria-hidden="true">
+                <span class="tarjeta-epoca__relleno" [attr.data-estado]="e.p.estado" [style.width.%]="e.avance"></span>
+              </span>
+              <span class="tarjeta-epoca__detalle">{{ e.detalle }}</span>
+            </button>
+          }
+        </div>
+        @if (!d.hayEpocaActiva) {
+          <div class="calendario__receso" role="status">
+            <span class="aviso-amarillo__icono" aria-hidden="true">!</span>
+            Hoy no hay ninguna época activa (receso entre épocas). Si no es correcto, revisa las fechas.
+          </div>
+        }
+      </section>
+
+      <!-- ═══════════════ CONTROL DEL PLAZO ═══════════════ -->
+      @if (esActivo() && control(); as c) {
+        <section class="control-plazo" [class.control-plazo--abierta]="c.abierta" aria-labelledby="ctl-t">
+          <div class="control-plazo__cabecera">
+            <h2 id="ctl-t" class="control-plazo__titulo">Control del plazo · Período {{ d.periodo.nombre }}</h2>
+            <span class="control-plazo__acciones">
+              <span class="chip-efectivo" [class.chip-efectivo--abierta]="c.abierta">
+                <span aria-hidden="true">{{ c.abierta ? '✓' : '✕' }}</span>{{ c.efectivo }}
+              </span>
+            </span>
+          </div>
+
+          <div class="control-plazo__columnas">
+            <div class="control-plazo__columna">
+              <span id="sw-l" class="control-plazo__rotulo">Carga de notas</span>
+              @if (puedeControlarPlazo()) {
+                <button
+                  type="button"
+                  role="switch"
+                  class="interruptor-carga"
+                  [class.interruptor-carga--encendido]="c.habilitada"
+                  [attr.aria-checked]="c.habilitada"
+                  aria-labelledby="sw-l"
+                  [disabled]="!enLinea() || guardandoPlazo()"
+                  [title]="enLinea() ? '' : motivoSinConexion"
+                  (click)="pedirInterruptor()"
+                >
+                  <span class="interruptor-carga__riel">
+                    <span class="interruptor-carga__pulgar" aria-hidden="true">{{ c.habilitada ? '✓' : '–' }}</span>
+                  </span>
+                  <span class="interruptor-carga__texto">{{ c.textoInterruptor }}</span>
+                </button>
+              } @else {
+                <span class="interruptor-carga__texto" [class.interruptor-carga__texto--encendido]="c.habilitada">{{ c.textoInterruptor }}</span>
+              }
+              <span class="control-plazo__nota">{{ c.subInterruptor }}</span>
+            </div>
+
+            <div class="control-plazo__columna">
+              <span class="control-plazo__rotulo">Fecha y hora límite</span>
+              @if (editandoFecha(); as e) {
+                <div class="fecha-hora">
+                  <label class="solo-lector" for="lim-d">Fecha límite</label>
+                  <input id="lim-d" type="date" class="fecha-hora__fecha" [class.fecha-hora--error]="avisoFechaEditada()?.tono === 'error'" [value]="e.fecha" (change)="cambiarFechaEditada('fecha', $any($event.target).value)" />
+                  <label class="solo-lector" for="lim-t">Hora límite</label>
+                  <input id="lim-t" type="time" class="fecha-hora__hora" [class.fecha-hora--error]="avisoFechaEditada()?.tono === 'error'" [value]="e.hora" (change)="cambiarFechaEditada('hora', $any($event.target).value)" />
+                </div>
+                @if (avisoFechaEditada(); as m) {
+                  <span class="control-plazo__mensaje" [attr.data-tono]="m.tono">{{ m.texto }}</span>
+                }
+                <div class="control-plazo__botones">
+                  <button type="button" class="boton boton--neutro boton--compacto-notas" (click)="editandoFecha.set(null)">Cancelar</button>
+                  <button
+                    type="button"
+                    class="boton boton--primario boton--compacto-notas"
+                    [disabled]="avisoFechaEditada()?.tono === 'error' || guardandoPlazo() || !enLinea()"
+                    (click)="guardarFecha()"
+                  >
+                    {{ guardandoPlazo() ? 'Guardando…' : 'Guardar fecha' }}
+                  </button>
+                </div>
+              } @else {
+                <span class="control-plazo__fecha notas-num">{{ c.limite }}</span>
+                <button
+                  *appHasRole="'btn_controlar_plazo_notas'"
+                  type="button"
+                  class="boton boton--secundario boton--compacto-notas"
+                  [disabled]="!enLinea()"
+                  [title]="enLinea() ? '' : motivoSinConexion"
+                  (click)="editarFecha()"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M4 10h16M9 3v4M15 3v4"></path></svg>
+                  Cambiar fecha
+                </button>
+              }
+              @if (errorPlazo(); as m) {
+                <span class="control-plazo__mensaje" data-tono="error" role="alert">✕ {{ m }}</span>
+              }
+            </div>
+
+            <div class="control-plazo__columna">
+              <span class="control-plazo__rotulo">{{ c.rotuloCuenta }}</span>
+              <span class="control-plazo__cuenta notas-num" [attr.data-tono]="c.tonoCuenta">{{ c.cuenta }}</span>
+              <span class="control-plazo__nota">{{ c.subCuenta }}</span>
+            </div>
+          </div>
+
+          <p class="control-plazo__regla">
+            Los profesores suben notas solo si la carga está <strong>habilitada</strong> y <strong>no pasó la fecha límite</strong>.
+            Una prórroga individual vale aunque la carga esté cerrada.
+          </p>
+        </section>
+      } @else {
+        <div class="banda-plazo" [attr.data-variante]="d.periodo.estado === 'futuro' ? 'futuro' : 'pasado'">
+          <span class="banda-plazo__icono" aria-hidden="true">{{ d.periodo.estado === 'futuro' ? '○' : '–' }}</span>
+          <span class="banda-plazo__textos">
+            @if (d.periodo.estado === 'futuro') {
+              <strong class="banda-plazo__titulo">Período {{ d.periodo.nombre }} aún no empieza</strong>
+              <span>Empieza el {{ diaMes(d.periodo.fechaInicio) }}, según el calendario de épocas. El plazo de carga se configura cuando esté activa.</span>
+            } @else {
+              <strong class="banda-plazo__titulo">Período {{ d.periodo.nombre }} cerrado · solo consulta</strong>
+              <span>La carga de este período ya terminó. Puedes ver y corregir notas desde “Ver notas”.</span>
+            }
+          </span>
+        </div>
+      }
+
+      @if (d.asignaciones.length === 0) {
+        <div class="notas-tarjeta notas-estado notas-estado--vacio">
+          <span class="notas-estado__icono" aria-hidden="true">0</span>
+          <h2>No hay asignaciones en {{ d.periodo.nombre }}</h2>
+          <p>Cuando se creen asignaciones en el módulo Asignaciones, aquí verás el avance de cada una.</p>
+        </div>
+      } @else {
+        <!-- ═══════════════ RESUMEN ═══════════════ -->
+        <div class="resumen-notas" role="group" aria-label="Resumen del período">
+          <div class="resumen-notas__global">
+            <span class="resumen-notas__rotulo">Avance global</span>
+            <span class="resumen-notas__cifra-linea">
+              <span class="resumen-notas__cifra notas-num">{{ resumen().porcentaje }}%</span>
+              <span class="resumen-notas__sub">{{ resumen().texto }}</span>
+            </span>
+            <div class="barra-avance" aria-hidden="true">
+              <div class="barra-avance__relleno" [style.width.%]="resumen().porcentaje"></div>
+            </div>
+          </div>
+          @for (k of indicadores(); track k.rotulo) {
+            <button
+              type="button"
+              class="resumen-notas__dato"
+              [class.resumen-notas__dato--elegido]="k.elegido"
+              [class.resumen-notas__dato--informativo]="!k.filtra"
+              [attr.aria-pressed]="k.filtra ? k.elegido : null"
+              [disabled]="!k.filtra"
+              (click)="elegirIndicador(k.clave, k.filtra)"
+            >
+              <span class="resumen-notas__rotulo">
+                <span class="resumen-notas__icono" [attr.data-tono]="k.tono" aria-hidden="true">{{ k.icono }}</span>{{ k.rotulo }}
+              </span>
+              <span class="resumen-notas__cifra resumen-notas__cifra--chica notas-num">{{ k.n }}</span>
+            </button>
+          }
+        </div>
+
+        <!-- ═══════════════ FILTROS + TABLA ═══════════════ -->
+        <section class="notas-tarjeta">
+          <div class="filtros-notas" role="search">
+            <div class="filtro-notas filtro-notas--ancho">
+              <label class="solo-lector" for="f-sede">Sede</label>
+              <select id="f-sede" class="filtro-notas__control" (change)="filtrar('sede', $any($event.target).value)">
+                <option value="" [selected]="!filtros().sede">Todas las sedes</option>
+                @for (s of opcionesFiltro().sedes; track s.id) {
+                  <option [value]="s.id" [selected]="filtros().sede === '' + s.id">{{ s.nombre }}</option>
+                }
+              </select>
+            </div>
+            <div class="filtro-notas">
+              <label class="solo-lector" for="f-curso">Grado y grupo</label>
+              <select id="f-curso" class="filtro-notas__control" (change)="filtrar('curso', $any($event.target).value)">
+                <option value="" [selected]="!filtros().curso">Todo grado/grupo</option>
+                @for (o of opcionesFiltro().cursos; track o.valor) {
+                  <option [value]="o.valor" [selected]="filtros().curso === o.valor">{{ o.rotulo }}</option>
+                }
+              </select>
+            </div>
+            <div class="filtro-notas filtro-notas--ancho">
+              <label class="solo-lector" for="f-prof">Profesor</label>
+              <select id="f-prof" class="filtro-notas__control" (change)="filtrar('profesor', $any($event.target).value)">
+                <option value="" [selected]="!filtros().profesor">Todos los profesores</option>
+                @for (p of opcionesFiltro().profesores; track p.id) {
+                  <option [value]="p.id" [selected]="filtros().profesor === p.id">{{ p.nombre }}</option>
+                }
+              </select>
+            </div>
+            <div class="filtro-notas filtro-notas--ancho">
+              <label class="solo-lector" for="f-mat">Materia</label>
+              <select id="f-mat" class="filtro-notas__control" (change)="filtrar('materia', $any($event.target).value)">
+                <option value="" [selected]="!filtros().materia">Todas las materias</option>
+                @for (m of opcionesFiltro().materias; track m) {
+                  <option [value]="m" [selected]="filtros().materia === m">{{ m }}</option>
+                }
+              </select>
+            </div>
+            <div class="filtro-notas">
+              <label class="solo-lector" for="f-est">Estado</label>
+              <select id="f-est" class="filtro-notas__control" (change)="filtrar('estado', $any($event.target).value)">
+                <option value="" [selected]="!filtros().estado">Todo estado</option>
+                <option value="completa" [selected]="filtros().estado === 'completa'">✓ Completa</option>
+                <option value="parcial" [selected]="filtros().estado === 'parcial'">◐ Parcial</option>
+                <option value="sin" [selected]="filtros().estado === 'sin'">○ Sin empezar</option>
+                @if (esActivo()) {
+                  <option value="prorroga" [selected]="filtros().estado === 'prorroga'">+ Con prórroga</option>
+                }
+              </select>
+            </div>
+
+            <div class="segmentado-notas" role="radiogroup" aria-label="Agrupar">
+              <button type="button" role="radio" class="segmentado-notas__opcion" [class.segmentado-notas__opcion--activa]="vista() === 'asignacion'" [attr.aria-checked]="vista() === 'asignacion'" (click)="vista.set('asignacion')">Por asignación</button>
+              <button type="button" role="radio" class="segmentado-notas__opcion" [class.segmentado-notas__opcion--activa]="vista() === 'profesor'" [attr.aria-checked]="vista() === 'profesor'" (click)="vista.set('profesor')">Por profesor</button>
+            </div>
+
+            <span class="filtros-notas__conteo">
+              <span aria-live="polite">{{ plural(filas().length, 'asignación', 'asignaciones') }}</span>
+              @if (hayFiltros()) {
+                <button type="button" class="boton-enlace-notas" (click)="quitarFiltros()">Quitar filtros</button>
+              }
+            </span>
+          </div>
+
+          @if (filas().length === 0) {
+            <div class="notas-sin-coincidencias">
+              <h3>Ninguna asignación coincide con estos filtros</h3>
+              <button type="button" class="boton-enlace-notas" (click)="quitarFiltros()">Quitar filtros</button>
+            </div>
+          } @else if (vista() === 'asignacion') {
+            <div class="tabla-avance__desplazable">
+              <div class="tabla-avance" role="table" aria-label="Avance por asignación">
+                <div class="tabla-avance__fila tabla-avance__fila--encabezado" role="row">
+                  <button type="button" role="columnheader" class="tabla-avance__orden" [class.tabla-avance__orden--activo]="encabezadosOrden().profesor.activo" [attr.aria-sort]="encabezadosOrden().profesor.aria" (click)="ordenarPor('profesor')">
+                    Profesor<span aria-hidden="true">{{ encabezadosOrden().profesor.icono }}</span>
+                  </button>
+                  <span role="columnheader">Materia</span>
+                  <span role="columnheader">Curso</span>
+                  <span role="columnheader">Sede</span>
+                  <button type="button" role="columnheader" class="tabla-avance__orden" [class.tabla-avance__orden--activo]="encabezadosOrden().avance.activo" [attr.aria-sort]="encabezadosOrden().avance.aria" (click)="ordenarPor('avance')">
+                    Avance<span aria-hidden="true">{{ encabezadosOrden().avance.icono }}</span>
+                  </button>
+                  <button type="button" role="columnheader" class="tabla-avance__orden" [class.tabla-avance__orden--activo]="encabezadosOrden().ultima.activo" [attr.aria-sort]="encabezadosOrden().ultima.aria" (click)="ordenarPor('ultima')">
+                    Última carga<span aria-hidden="true">{{ encabezadosOrden().ultima.icono }}</span>
+                  </button>
+                  <span role="columnheader">Estado</span>
+                  <span role="columnheader" class="tabla-avance__acciones">Acciones</span>
+                </div>
+                @for (r of filas(); track r.a.id) {
+                  <div class="tabla-avance__fila" role="row" [class.tabla-avance__fila--elegida]="verNotas() === r.a.id">
+                    <span role="cell" class="celda-profesor">
+                      <span class="celda-profesor__avatar" aria-hidden="true">{{ r.iniciales }}</span>
+                      <span class="celda-profesor__nombre">{{ r.a.profesor.nombre }}</span>
+                    </span>
+                    <span role="cell">{{ r.a.materia }}</span>
+                    <span role="cell" class="notas-num notas-num--fuerte">{{ r.curso }}</span>
+                    <span role="cell" class="tabla-avance__sede">{{ r.a.sede.nombre }}</span>
+                    <div role="cell" class="celda-avance">
+                      <div class="barra-avance" aria-hidden="true">
+                        <div class="barra-avance__relleno" [attr.data-estado]="r.estado" [style.width.%]="r.porcentaje"></div>
+                      </div>
+                      <span class="notas-num notas-num--fuerte celda-avance__fraccion">{{ r.fraccion }}</span>
+                    </div>
+                    <span role="cell" class="notas-num notas-num--doc">{{ r.ultima }}</span>
+                    <span role="cell" class="celda-estado">
+                      <span class="chip-avance" [attr.data-estado]="r.estado">
+                        <span class="chip-avance__icono" aria-hidden="true">{{ r.chip.icono }}</span>{{ r.chip.texto }}
+                      </span>
+                      @if (r.prorroga) {
+                        <span class="texto-prorroga"><span aria-hidden="true">+</span>{{ r.textoProrroga }}</span>
+                      }
+                    </span>
+                    <div role="cell" class="tabla-avance__acciones">
+                      <ng-container *ngTemplateOutlet="accionesFila; context: { $implicit: r }" />
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          } @else {
+            <div class="por-profesor">
+              @for (g of porProfesor(); track g.id) {
+                <div class="por-profesor__grupo">
+                  <div class="por-profesor__cabecera">
+                    <span class="celda-profesor__avatar celda-profesor__avatar--grande" aria-hidden="true">{{ g.iniciales }}</span>
+                    <span class="por-profesor__titulos">
+                      <span class="por-profesor__nombre">{{ g.nombre }}</span>
+                      <span class="por-profesor__sub">{{ g.sub }}</span>
+                    </span>
+                    <span class="por-profesor__resumen">
+                      @for (ch of g.chips; track ch.estado) {
+                        <span class="chip-avance chip-avance--chico" [attr.data-estado]="ch.estado">
+                          <span class="chip-avance__icono" aria-hidden="true">{{ ch.icono }}</span>{{ ch.texto }}
+                        </span>
+                      }
+                      <span class="por-profesor__faltan" [class.por-profesor__faltan--al-dia]="g.faltan === 0">{{ g.textoFaltan }}</span>
+                    </span>
+                  </div>
+                  @for (r of g.filas; track r.a.id) {
+                    <div class="por-profesor__fila">
+                      <span class="por-profesor__materia">{{ r.a.materia }} <span class="notas-num notas-num--fuerte">{{ r.curso }}</span></span>
+                      <span>
+                        <span class="chip-avance chip-avance--chico" [attr.data-estado]="r.estado">
+                          <span class="chip-avance__icono" aria-hidden="true">{{ r.chip.icono }}</span>{{ r.chip.texto }}
+                        </span>
+                      </span>
+                      <div class="celda-avance">
+                        <div class="barra-avance barra-avance--fina" aria-hidden="true">
+                          <div class="barra-avance__relleno" [attr.data-estado]="r.estado" [style.width.%]="r.porcentaje"></div>
+                        </div>
+                        <span class="notas-num notas-num--fuerte">{{ r.fraccion }}</span>
+                      </div>
+                      <span class="notas-num notas-num--doc">{{ r.ultima }}</span>
+                      <div class="tabla-avance__acciones tabla-avance__acciones--plano">
+                        <ng-container *ngTemplateOutlet="accionesFila; context: { $implicit: r }" />
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </section>
+
+        <ng-template #accionesFila let-r>
+          <button type="button" class="boton-fila-notas" [attr.aria-label]="'Ver notas de ' + r.a.materia + ' ' + r.curso" (click)="verNotas.set(r.a.id)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            Ver notas
+          </button>
+          <button
+            *appHasRole="'btn_dar_prorroga'"
+            type="button"
+            class="boton-fila-notas boton-fila-notas--neutro"
+            [disabled]="!esActivo() || !enLinea()"
+            [title]="!esActivo() ? 'Solo en el período activo' : !enLinea() ? motivoSinConexion : ''"
+            [attr.aria-label]="r.botonProrroga + ' a ' + r.a.profesor.nombre + ' en ' + r.a.materia + ' ' + r.curso"
+            (click)="abrirProrroga(r.a)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2M9 2h6"></path></svg>
+            {{ r.botonProrroga }}
+          </button>
+        </ng-template>
+
+        <!-- ═══════════════ PRÓRROGAS ACTIVAS ═══════════════ -->
+        @if (esActivo()) {
+          <section class="notas-tarjeta" aria-labelledby="pr-t">
+            <div class="notas-tarjeta__cabecera">
+              <h2 id="pr-t" class="notas-tarjeta__titulo">Prórrogas activas · {{ d.periodo.nombre }}</h2>
+              <span class="notas-tarjeta__conteo">{{ plural(prorrogas().length, 'prórroga', 'prórrogas') }}</span>
+            </div>
+            <div class="notas-desplazable">
+            @for (p of prorrogas(); track p.x.a.id) {
+              <div class="prorroga-fila">
+                <span class="prorroga-fila__bloque">
+                  <span class="prorroga-fila__fuerte">{{ p.x.a.profesor.nombre }}</span>
+                  <span class="prorroga-fila__sub">{{ p.x.a.sede.nombre }}</span>
+                </span>
+                <span class="prorroga-fila__curso">{{ p.x.a.materia }} <span class="notas-num notas-num--fuerte">{{ p.x.curso }}</span></span>
+                <span class="prorroga-fila__bloque">
+                  <span class="notas-num">Hasta {{ p.hasta }}</span>
+                  <span class="prorroga-fila__falta">{{ p.falta }}</span>
+                </span>
+                <span class="prorroga-fila__bloque prorroga-fila__motivo">
+                  <span>{{ p.x.prorroga!.motivo }}</span>
+                  <span class="prorroga-fila__sub">Autorizó {{ p.x.prorroga!.autorizadoPor }} · {{ p.autorizada }}</span>
+                </span>
+                <div class="prorroga-fila__acciones" *appHasRole="'btn_dar_prorroga'">
+                  @if (quitando() === p.x.a.id) {
+                    <span class="prorroga-fila__pregunta">¿Quitar?</span>
+                    <button type="button" class="boton-fila-notas boton-fila-notas--neutro" (click)="quitando.set(null)">No</button>
+                    <button type="button" class="boton-fila-notas boton-fila-notas--peligro-lleno" (click)="quitarProrroga(p.x)">Sí, quitar</button>
+                  } @else {
+                    <button type="button" class="boton-fila-notas" [disabled]="!enLinea()" [title]="enLinea() ? '' : motivoSinConexion" (click)="abrirProrroga(p.x.a)">Modificar</button>
+                    <button type="button" class="boton-fila-notas boton-fila-notas--peligro" [disabled]="!enLinea()" [title]="enLinea() ? '' : motivoSinConexion" (click)="quitando.set(p.x.a.id)">Quitar</button>
+                  }
+                </div>
+              </div>
+            } @empty {
+              <p class="prorroga-vacia">No hay prórrogas activas. Se dan desde la fila de cada asignación con “Dar prórroga”.</p>
+            }
+            </div>
+          </section>
+        }
+      }
+      }
+    }
+  </section>
+  </div>
+
+  <!-- ═══════════════ PANEL Y MODALES ═══════════════ -->
+  @if (asignacionPanel(); as a) {
+    <app-panel-ver-notas
+      [asignacion]="a"
+      [periodo]="periodo()!"
+      [prorroga]="filaPanel()?.prorroga ?? null"
+      (cerrar)="verNotas.set(null)"
+      (darProrroga)="abrirProrroga(a)"
+      (corregida)="alCorregir($event)"
+    />
+  }
+
+  @if (enProrroga(); as a) {
+    <app-dialogo-prorroga
+      [asignacion]="a"
+      [periodo]="periodo()!"
+      [ahora]="ahora()"
+      [prorroga]="prorrogaVigenteDe(a)"
+      (cerrar)="enProrroga.set(null)"
+      (guardada)="alGuardarProrroga($event)"
+    />
+  }
+
+  @if (editandoCalendario() && datos(); as d) {
+    <app-dialogo-calendario
+      [periodos]="d.periodos"
+      [hoy]="d.hoy"
+      (cerrar)="editandoCalendario.set(false)"
+      (guardado)="alGuardarCalendario($event)"
+    />
+  }
+
+  @if (confirmandoInterruptor() && textoInterruptor(); as t) {
+    <div class="modal modal--notas modal--centrado" role="presentation" (mousedown)="$event.target === $event.currentTarget && confirmandoInterruptor.set(false)">
+      <div
+        class="modal__panel dialogo-notas dialogo-notas--angosto"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="sw-t"
+        appModal
+        (cerrarModal)="confirmandoInterruptor.set(false)"
+      >
+        <h2 id="sw-t" class="dialogo-notas__titulo">{{ t.titulo }}</h2>
+        <p class="dialogo-notas__texto">{{ t.texto }}</p>
+        @if (t.advertencia) {
+          <div class="aviso-amarillo">
+            <span class="aviso-amarillo__icono" aria-hidden="true">!</span>
+            <span>{{ t.advertencia }}</span>
+          </div>
+        }
+        @if (errorPlazo(); as m) {
+          <p class="dialogo-notas__error" role="alert">✕ {{ m }}</p>
+        }
+        <div class="dialogo-notas__botones">
+          <button type="button" class="boton boton--neutro" (click)="confirmandoInterruptor.set(false)">Cancelar</button>
+          <button
+            type="button"
+            class="boton boton--grande"
+            [class.boton--primario]="t.abrir"
+            [class.boton--peligro]="!t.abrir"
+            [disabled]="guardandoPlazo() || !enLinea()"
+            (click)="cambiarInterruptor()"
+          >
+            {{ guardandoPlazo() ? 'Guardando…' : t.boton }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+}

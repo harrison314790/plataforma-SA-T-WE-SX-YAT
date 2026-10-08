@@ -1,0 +1,294 @@
+<!--
+  "Registro de notas" (profesor). Calcado del mockup aprobado; estilos en
+  estilos/notas.css, todo bajo `.notas-pagina`.
+-->
+@if (sinPermiso()) {
+  <app-sin-permiso />
+} @else {
+  <div class="notas-pagina">
+  <section class="notas" [class.notas--con-pie]="cursoAbierto() && mostrarPie()">
+    <header class="notas__cabecera">
+      <div class="notas__titulos">
+        <h1 class="notas__titulo">Registro de notas</h1>
+        <p class="notas__ayuda">
+          Sube la nota de cada estudiante una sola vez por período. Revisa antes de guardar: después no se puede cambiar.
+        </p>
+      </div>
+      <label class="selector-periodo">
+        Período
+        <span class="selector-periodo__caja">
+          <select
+            class="selector-periodo__control"
+            [disabled]="datos() === null"
+            (change)="elegirPeriodo($any($event.target).value)"
+          >
+            @for (o of opcionesPeriodo(); track o.id) {
+              <option [value]="o.id" [selected]="o.id === periodo()?.id">{{ o.rotulo }}</option>
+            }
+          </select>
+        </span>
+      </label>
+    </header>
+
+    @if (aviso(); as a) {
+      <div class="notas-aviso" [attr.data-tono]="a.tipo" role="status">
+        <span class="notas-aviso__icono" aria-hidden="true">{{ a.tipo === 'ok' ? '✓' : '–' }}</span>
+        <span class="notas-aviso__texto">{{ a.texto }}</span>
+        <button type="button" class="notas-aviso__cerrar" aria-label="Cerrar aviso" (click)="aviso.set(null)">×</button>
+      </div>
+    }
+
+    @if (banda(); as b) {
+      <div class="banda-plazo" [attr.data-variante]="b.variante" role="status" aria-label="Estado del plazo de carga">
+        <span class="banda-plazo__icono" aria-hidden="true">{{ b.icono }}</span>
+        <span class="banda-plazo__textos">
+          <strong class="banda-plazo__titulo">{{ b.titulo }}</strong>
+          <span>{{ b.texto }}</span>
+        </span>
+      </div>
+    }
+
+    @if (cargando()) {
+      <div class="notas-tarjeta notas-esqueleto" aria-busy="true" aria-label="Cargando">
+        <div class="notas-esqueleto__barra-superior"><span></span><span></span><span></span></div>
+        @for (anchos of anchosEsqueleto; track $index) {
+          <div class="notas-esqueleto__fila">
+            <span [style.width]="anchos[0]"></span>
+            <span class="notas-esqueleto__suave" [style.width]="anchos[1]"></span>
+            <span class="notas-esqueleto__progreso"></span>
+            <span class="notas-esqueleto__chip"></span>
+          </div>
+        }
+      </div>
+    } @else if (error() !== null) {
+      <div class="notas-tarjeta notas-estado" role="alert">
+        <span class="notas-estado__icono notas-estado__icono--error" aria-hidden="true">✕</span>
+        <h2>No pudimos cargar tus cursos</h2>
+        <p>{{ error() }} Las notas ya registradas están a salvo.</p>
+        <button type="button" class="boton boton--primario" (click)="reintentar()">Reintentar</button>
+      </div>
+    } @else if (datos()) {
+      <!-- `@if (…; as d)` aparte: Angular 18 no admite alias en `@else if`. -->
+      @if (datos(); as d) {
+      @if (d.asignaciones.length === 0) {
+        <div class="notas-tarjeta notas-estado notas-estado--vacio">
+          <span class="notas-estado__icono" aria-hidden="true">0</span>
+          <h2>No tienes asignaciones en {{ d.periodo.anio }}</h2>
+          <p>Cuando coordinación te asigne materias y cursos, aparecerán aquí para que subas las notas.</p>
+        </div>
+      } @else {
+        @if (asignacion(); as a) {
+        <!-- ═══════════════ CAPTURA DE UN CURSO ═══════════════ -->
+        <section class="notas-tarjeta" aria-labelledby="cu-t">
+          <div class="captura__cabecera">
+            <div class="captura__curso">
+              <button type="button" class="boton-volver" (click)="pedir({ tipo: 'volver' })">
+                <span aria-hidden="true">‹</span>Mis cursos
+              </button>
+              <div class="captura__titulos">
+                <h2 id="cu-t" class="captura__titulo">{{ a.materia }} <span class="notas-num">{{ curso(a.grado, a.grupo) }}</span></h2>
+                <span class="captura__sub">{{ a.sede.nombre }} · Período {{ d.periodo.nombre }}</span>
+              </div>
+            </div>
+            @if (cursoActual(); as c) {
+              <span class="captura__avance">
+                <span class="notas-num notas-num--suave">{{ c.fraccion }}</span>
+                <span class="chip-avance" [attr.data-estado]="c.estado">
+                  <span class="chip-avance__icono" aria-hidden="true">{{ c.chip.icono }}</span>{{ c.chip.textoProfesor }}
+                </span>
+              </span>
+            }
+          </div>
+
+          @if (editable() && resumen().faltan > 0) {
+            <div class="captura__ayuda">
+              <span class="captura__ayuda-icono" aria-hidden="true">i</span>
+              <span>
+                Nota de <strong>1,0 a 5,0</strong> con un decimal. <strong>Enter</strong> pasa al siguiente estudiante.
+                Puedes escribir <span class="notas-num">45</span> para <span class="notas-num">4,5</span>. Las notas guardadas no se pueden cambiar.
+              </span>
+            </div>
+          }
+
+          <div class="captura__tabla" role="table" aria-label="Notas del curso">
+            <div class="captura__fila captura__fila--encabezado" role="row">
+              <span role="columnheader" class="captura__col-num">#</span>
+              <span role="columnheader">Estudiante</span>
+              <span role="columnheader" class="captura__col-doc">Documento</span>
+              <span role="columnheader">Nota</span>
+              <span role="columnheader">Desempeño</span>
+              <span role="columnheader">Registro</span>
+            </div>
+            @for (f of filas(); track f.e.id) {
+              <div class="captura__fila" role="row" [class.captura__fila--resaltada]="f.resaltada">
+                <span role="cell" class="captura__col-num notas-num notas-num--suave">{{ f.numero }}</span>
+                <span role="cell" class="captura__nombre">{{ f.nombre }}</span>
+                <span role="cell" class="captura__col-doc notas-num notas-num--doc">{{ f.e.documento }}</span>
+                <div role="cell" class="captura__nota">
+                  @if (f.bloqueada) {
+                    <span class="nota-bloqueada">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" role="img" aria-label="Bloqueada">
+                        <rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path>
+                      </svg>
+                      <span class="notas-num">{{ f.valorBloqueado }}</span>
+                    </span>
+                  } @else if (f.puedeEscribir) {
+                    <input
+                      #campoNota
+                      class="campo-nota"
+                      [class.campo-nota--escrito]="f.texto && !f.error"
+                      [class.campo-nota--error]="f.error"
+                      [attr.aria-label]="'Nota de ' + f.nombre"
+                      [attr.aria-invalid]="f.error ? 'true' : 'false'"
+                      inputmode="decimal"
+                      enterkeyhint="next"
+                      autocomplete="off"
+                      placeholder="—"
+                      [value]="f.texto"
+                      (input)="escribir(f.e.id, $event)"
+                      (blur)="alSalir(f.e.id)"
+                      (keydown)="tecla(f.e.id, $event)"
+                    />
+                    @if (f.error) {
+                      <span class="captura__error" role="alert">✕ {{ f.error }}</span>
+                    }
+                  } @else {
+                    <span class="captura__sin-nota"><span aria-hidden="true">–</span>{{ f.textoSinNota }}</span>
+                  }
+                </div>
+                <span role="cell" class="captura__desempeno">
+                  @if (f.desempeno; as de) {
+                    <span class="chip-desempeno" [attr.data-tono]="de.tono">
+                      <span class="chip-desempeno__icono" aria-hidden="true">{{ de.icono }}</span>{{ de.texto }}
+                    </span>
+                  } @else {
+                    <span class="captura__guion">—</span>
+                  }
+                </span>
+                <span role="cell" class="captura__registro" [class.captura__registro--borrador]="f.borrador">
+                  @if (f.borrador) {
+                    <span class="punto-borrador" aria-hidden="true"></span>
+                  }
+                  <span>{{ f.registro }}</span>
+                </span>
+              </div>
+            }
+          </div>
+
+          @if (mostrarPie()) {
+            <div class="captura__pie">
+              <span class="captura__pie-texto" aria-live="polite">
+                <span class="captura__pie-punto" [attr.data-tono]="pie().tono" aria-hidden="true"></span>{{ pie().texto }}
+              </span>
+              <div class="captura__pie-botones">
+                @if (pie().hayBorrador) {
+                  <button type="button" class="boton boton--fantasma-neutro" (click)="descartar()">Descartar</button>
+                }
+                <button
+                  #botonRevisar
+                  type="button"
+                  class="boton boton--primario boton--grande"
+                  [disabled]="pie().deshabilitado"
+                  [title]="pie().motivo"
+                  (click)="abrirRevision()"
+                >
+                  {{ pie().boton }}
+                </button>
+              </div>
+            </div>
+          }
+        </section>
+        } @else {
+        <!-- ═══════════════ MIS CURSOS ═══════════════ -->
+        <section class="notas-tarjeta" aria-labelledby="mc-t">
+          <div class="notas-tarjeta__cabecera">
+            <h2 id="mc-t" class="notas-tarjeta__titulo">Mis cursos · {{ d.periodo.nombre }}</h2>
+            <span class="notas-tarjeta__conteo">{{ plural(d.asignaciones.length, 'asignación', 'asignaciones') }}</span>
+          </div>
+          @for (c of cursos(); track c.a.id) {
+            <div class="mis-cursos__fila">
+              <div class="mis-cursos__curso">
+                <span class="mis-cursos__materia">{{ c.a.materia }} <span class="notas-num">{{ c.curso }}</span></span>
+                <span class="mis-cursos__meta">
+                  <span>{{ c.a.sede.nombre }}</span>
+                  @if (c.prorroga) {
+                    <span class="etiqueta-prorroga"><span aria-hidden="true">+</span>{{ c.prorroga }}</span>
+                  }
+                  @if (c.borradores > 0) {
+                    <span class="etiqueta-borrador">
+                      <span class="punto-borrador" aria-hidden="true"></span>{{ plural(c.borradores, 'nota', 'notas') }} en borrador
+                    </span>
+                  }
+                </span>
+              </div>
+              <div class="mis-cursos__progreso">
+                <div class="barra-avance" aria-hidden="true">
+                  <div class="barra-avance__relleno" [attr.data-estado]="c.estado" [style.width.%]="c.porcentaje"></div>
+                </div>
+                <span class="mis-cursos__progreso-texto">{{ c.progreso }}</span>
+              </div>
+              <span>
+                <span class="chip-avance" [attr.data-estado]="c.estado">
+                  <span class="chip-avance__icono" aria-hidden="true">{{ c.chip.icono }}</span>{{ c.chip.textoProfesor }}
+                </span>
+              </span>
+              <div class="mis-cursos__accion">
+                <button
+                  type="button"
+                  class="boton"
+                  [class.boton--primario]="c.puedeRegistrar"
+                  [class.boton--secundario]="!c.puedeRegistrar"
+                  [attr.aria-label]="(c.puedeRegistrar ? 'Registrar' : 'Ver') + ' notas de ' + c.a.materia + ' ' + c.curso"
+                  (click)="pedir({ tipo: 'curso', id: c.a.id })"
+                >
+                  @if (c.puedeRegistrar) {
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"></path></svg>
+                    Registrar notas
+                  } @else {
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    Ver notas
+                  }
+                </button>
+              </div>
+            </div>
+          }
+        </section>
+        }
+      }
+      }
+    }
+  </section>
+  </div>
+
+  @if (revisando() && asignacion(); as a) {
+    <app-dialogo-revisar-notas
+      [asignacion]="a"
+      [periodo]="periodo()!"
+      [notas]="resumen().listas"
+      [sinNota]="resumen().faltan - resumen().listas.length"
+      (cerrar)="revisando.set(false)"
+      (guardadas)="alGuardar($event)"
+      (sinPermiso)="alPerderPermiso()"
+    />
+  }
+
+  @if (pendiente(); as accion) {
+    <div class="modal modal--notas modal--centrado" role="presentation">
+      <div
+        class="modal__panel dialogo-notas dialogo-notas--angosto"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="pd-t"
+        appModal
+        (cerrarModal)="pendiente.set(null)"
+      >
+        <h2 id="pd-t" class="dialogo-notas__titulo">{{ textoPendiente().titulo }}</h2>
+        <p class="dialogo-notas__texto">{{ textoPendiente().texto }}</p>
+        <div class="dialogo-notas__botones">
+          <button type="button" class="boton boton--neutro" (click)="hacer(accion)">Salir de todos modos</button>
+          <button type="button" class="boton boton--primario" (click)="pendiente.set(null)">Seguir aquí</button>
+        </div>
+      </div>
+    </div>
+  }
+}

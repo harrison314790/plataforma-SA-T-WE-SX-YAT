@@ -121,13 +121,10 @@ class NudoPedagogicoService
         ];
     }
 
-    /** El año del período activo: es el que la pantalla describe. */
+    /** El año escolar en curso (por fecha): es el que la pantalla describe. */
     private function anioDeTrabajo(): int
     {
-        $activo = PeriodoAcademico::query()->where('activo', true)
-            ->orderByDesc('anio')->orderByDesc('numero')->value('anio');
-
-        return (int) ($activo ?? PeriodoAcademico::query()->max('anio') ?? now()->year);
+        return PeriodoAcademico::anioEscolarActual();
     }
 
     public function crear(array $datos): array

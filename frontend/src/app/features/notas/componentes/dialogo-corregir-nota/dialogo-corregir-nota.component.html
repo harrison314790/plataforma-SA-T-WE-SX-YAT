@@ -1,0 +1,74 @@
+<div class="modal modal--notas modal--centrado modal--encima" role="presentation" (mousedown)="$event.target === $event.currentTarget && cerrar.emit()">
+  <div
+    class="modal__panel dialogo-notas dialogo-notas--angosto"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="cr-t"
+    appModal
+    (cerrarModal)="cerrar.emit()"
+  >
+    <div>
+      <h2 id="cr-t" class="dialogo-notas__titulo">Corregir nota</h2>
+      <p class="dialogo-notas__subtitulo">{{ datos().contexto }}</p>
+    </div>
+
+    <div class="correccion__valores">
+      <div class="campo-notas">
+        <span class="campo-notas__rotulo">Valor anterior</span>
+        <span class="correccion__anterior">
+          <span class="notas-num">{{ antes().texto }}</span>
+          <span class="correccion__anterior-desempeno" [attr.data-tono]="antes().desempeno.tono">{{ antes().desempeno.texto }}</span>
+        </span>
+      </div>
+      <div class="campo-notas">
+        <label class="campo-notas__rotulo" for="cr-n">Valor nuevo <span class="campo-notas__obligatorio" aria-hidden="true">*</span></label>
+        <input
+          id="cr-n"
+          class="correccion__nuevo notas-num"
+          [class.correccion__nuevo--error]="ayudaValor().error && valor()"
+          inputmode="decimal"
+          autocomplete="off"
+          placeholder="—"
+          [value]="valor()"
+          [attr.aria-invalid]="ayudaValor().error ? 'true' : 'false'"
+          aria-describedby="cr-n-ayuda"
+          (input)="escribirValor($event)"
+          (blur)="normalizar()"
+        />
+        <span id="cr-n-ayuda" class="campo-notas__ayuda" [class.campo-notas__ayuda--error]="ayudaValor().error && (valor() || errores().valor)">{{ ayudaValor().texto }}</span>
+      </div>
+    </div>
+
+    <div class="campo-notas">
+      <label class="campo-notas__rotulo" for="cr-m">Motivo de la corrección <span class="campo-notas__obligatorio" aria-hidden="true">*</span></label>
+      <textarea
+        id="cr-m"
+        class="campo-notas__texto"
+        [class.campo-notas__texto--error]="errores().motivo"
+        rows="3"
+        maxlength="500"
+        placeholder="Ej.: error de digitación; se verificó con la planilla del profesor"
+        [value]="motivo()"
+        (input)="escribirMotivo($any($event.target).value)"
+      ></textarea>
+      @if (errores().motivo; as e) {
+        <span class="campo-notas__error" role="alert">✕ {{ e }}</span>
+      }
+    </div>
+
+    <p class="dialogo-notas__nota">
+      Queda registrado: valor anterior, valor nuevo, motivo, {{ quien()?.nombreCompleto }} y la fecha.
+    </p>
+
+    @if (errorGeneral(); as m) {
+      <p class="dialogo-notas__error" role="alert">✕ {{ m }}</p>
+    }
+
+    <div class="dialogo-notas__botones">
+      <button type="button" class="boton boton--neutro" (click)="cerrar.emit()">Cancelar</button>
+      <button type="button" class="boton boton--primario boton--grande" [disabled]="guardando() || !enLinea()" (click)="guardar()">
+        {{ guardando() ? 'Guardando…' : 'Guardar corrección' }}
+      </button>
+    </div>
+  </div>
+</div>

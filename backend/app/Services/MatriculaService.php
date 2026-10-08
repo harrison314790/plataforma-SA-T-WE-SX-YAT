@@ -375,10 +375,7 @@ class MatriculaService
 
     private function anioActual(): int
     {
-        $activo = PeriodoAcademico::query()->where('activo', true)
-            ->orderByDesc('anio')->orderByDesc('numero')->value('anio');
-
-        return (int) ($activo ?? PeriodoAcademico::query()->max('anio') ?? now()->year);
+        return PeriodoAcademico::anioEscolarActual();
     }
 
     private function curso(int $grado, string $grupo): string

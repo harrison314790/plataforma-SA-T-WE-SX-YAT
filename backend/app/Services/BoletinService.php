@@ -55,12 +55,9 @@ class BoletinService
         $anios = PeriodoAcademico::query()->distinct()->pluck('anio')
             ->map(fn ($a) => (int) $a)->unique()->sortDesc()->values()->all();
 
-        $activo = PeriodoAcademico::query()->where('activo', true)
-            ->orderByDesc('anio')->orderByDesc('numero')->value('anio');
-
         return [
             'anios' => $anios,
-            'anioSugerido' => $activo !== null ? (int) $activo : ($anios[0] ?? null),
+            'anioSugerido' => $anios ? PeriodoAcademico::anioEscolarActual() : null,
             'sedes' => Sede::query()->orderBy('nombre')->get()
                 ->map(fn (Sede $s) => ['id' => $s->id, 'nombre' => $s->nombre])->all(),
             'ofertaGrados' => OfertaGrado::query()->where('activo', true)
@@ -99,8 +96,13 @@ class BoletinService
      */
     public function aniosDe(Estudiante $estudiante): array
     {
-        // Hay un período activo ese año: el boletín sigue abierto.
-        $aniosEnCurso = PeriodoAcademico::query()->where('activo', true)->pluck('anio')
+        // El año todavía no terminó (su última época no ha cerrado): el
+        // boletín sigue abierto. Por fecha, no por "hay época activa": en
+        // el receso de mitad de año el boletín no está cerrado.
+        $aniosEnCurso = PeriodoAcademico::query()
+            ->groupBy('anio')
+            ->havingRaw('max(fecha_fin) >= ?', [PeriodoAcademico::hoy()])
+            ->pluck('anio')
             ->map(fn ($a) => (int) $a)->all();
 
         return $this->matriculasDe($estudiante)

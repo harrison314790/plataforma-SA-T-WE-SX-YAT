@@ -1,0 +1,84 @@
+<div class="modal modal--notas modal--centrado" role="presentation" (mousedown)="$event.target === $event.currentTarget && cerrar.emit()">
+  <div
+    class="modal__panel dialogo-notas dialogo-notas--con-scroll dialogo-notas--calendario"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="ce-t"
+    appModal
+    (cerrarModal)="cerrar.emit()"
+  >
+    <div class="dialogo-notas__cabecera">
+      <h2 id="ce-t" class="dialogo-notas__titulo">Calendario de épocas · Año escolar {{ anio() }}</h2>
+      <p class="dialogo-notas__subtitulo dialogo-notas__subtitulo--parrafo">
+        Escribe las fechas que aprobó rectoría. Se hace una vez, a inicio de año; después la época activa cambia sola según la fecha de hoy.
+      </p>
+    </div>
+
+    <div class="dialogo-notas__cuerpo dialogo-notas__cuerpo--calendario">
+      <div>
+        @for (f of vista(); track f.id; let i = $index) {
+          <div class="calendario-fila">
+            <span class="calendario-fila__epoca">
+              <span class="calendario-fila__nombre">{{ f.p.epoca }} Época</span>
+              <span class="calendario-fila__codigo notas-num">{{ f.p.nombre }} · {{ f.p.epocaNasa }}</span>
+              <span class="calendario-fila__duracion">{{ f.duracion }}</span>
+            </span>
+            <label class="calendario-fila__campo">
+              Inicia
+              <input
+                type="date"
+                [class.calendario-fila__control--error]="f.error"
+                [attr.min]="anio() + '-01-01'"
+                [attr.max]="anio() + '-12-31'"
+                [value]="f.inicio"
+                (change)="cambiar(i, 'inicio', $any($event.target).value)"
+              />
+            </label>
+            <label class="calendario-fila__campo">
+              Cierra
+              <input
+                type="date"
+                [class.calendario-fila__control--error]="f.error"
+                [attr.min]="anio() + '-01-01'"
+                [attr.max]="anio() + '-12-31'"
+                [value]="f.fin"
+                (change)="cambiar(i, 'fin', $any($event.target).value)"
+              />
+            </label>
+            @if (f.error) {
+              <span class="calendario-fila__error" role="alert">✕ {{ f.error }}</span>
+            }
+          </div>
+        }
+      </div>
+
+      @if (consecuencia(); as c) {
+        <div class="calendario-aviso" [attr.data-tono]="c.tono" role="status">
+          <span class="calendario-aviso__icono" aria-hidden="true">{{ c.icono }}</span>
+          <span>{{ c.texto }}</span>
+        </div>
+      }
+
+      <p class="dialogo-notas__nota">
+        Cambiar estas fechas no borra notas. La fecha límite para subir notas se maneja aparte, en “Control del plazo”.
+      </p>
+
+      @if (errorGeneral(); as m) {
+        <p class="dialogo-notas__error" role="alert">✕ {{ m }}</p>
+      }
+    </div>
+
+    <div class="dialogo-notas__pie">
+      <button type="button" class="boton boton--neutro" (click)="cerrar.emit()">Cancelar</button>
+      <button
+        type="button"
+        class="boton boton--primario boton--grande"
+        [class.boton--apagado]="hayErrores()"
+        [disabled]="guardando() || !enLinea()"
+        (click)="guardar()"
+      >
+        {{ guardando() ? 'Guardando…' : 'Guardar calendario' }}
+      </button>
+    </div>
+  </div>
+</div>

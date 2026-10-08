@@ -92,21 +92,12 @@ class AutenticacionService
     }
 
     /**
-     * `periodos_academicos.activo` marca el período en curso. Puede no
-     * haber ninguno (entre un año escolar y el siguiente), y eso no es un
+     * La época en curso, por fecha (22-epocas-por-fecha.sql). Puede no
+     * haber ninguna (receso entre épocas o entre años), y eso no es un
      * error: la barra superior sabe mostrar ese caso.
-     *
-     * Si hubiera más de uno marcado activo -- un dato inconsistente que la
-     * base hoy no impide -- se toma el más reciente en vez de fallar: dejar
-     * a todo el mundo sin poder entrar por un período mal marcado sería una
-     * reacción desproporcionada a un problema que solo afecta un rótulo.
      */
     private function periodoActivo(): ?PeriodoAcademico
     {
-        return PeriodoAcademico::query()
-            ->where('activo', true)
-            ->orderByDesc('anio')
-            ->orderByDesc('numero')
-            ->first();
+        return PeriodoAcademico::actual();
     }
 }

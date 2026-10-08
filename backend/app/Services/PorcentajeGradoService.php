@@ -41,15 +41,10 @@ class PorcentajeGradoService
             ->map(fn ($anio) => (int) $anio)
             ->unique()->sortDesc()->values()->all();
 
-        $activo = PeriodoAcademico::query()
-            ->where('activo', true)
-            ->orderByDesc('anio')->orderByDesc('numero')
-            ->value('anio');
-
         return [
             'grados' => range(6, 11),
             'anios' => $anios,
-            'anioSugerido' => $activo !== null ? (int) $activo : ($anios[0] ?? null),
+            'anioSugerido' => $anios ? PeriodoAcademico::anioEscolarActual() : null,
         ];
     }
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * El profesor inserta una nota una sola vez y no puede editarla nunca --
@@ -67,5 +68,11 @@ class Nota extends Model
     public function registradoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'registrado_por');
+    }
+
+    /** Las correcciones de coordinación, de la más vieja a la más nueva. */
+    public function historial(): HasMany
+    {
+        return $this->hasMany(HistorialNota::class, 'nota_id')->orderBy('corregido_en');
     }
 }

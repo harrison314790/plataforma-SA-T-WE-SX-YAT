@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Único lugar que decide qué campos de una asignación viajan al frontend.
  * Claves en camelCase, espejo 1:1 de
  * `frontend/src/app/core/interfaces/asignacion.interface.ts` -- mismo
- * criterio que NotaResource y UsuarioResource.
+ * criterio que UsuarioResource.
  *
  * QUÉ NO SALE, Y POR QUÉ
  * · `creado_por` -- es auditoría interna. Quién dio de alta la asignación

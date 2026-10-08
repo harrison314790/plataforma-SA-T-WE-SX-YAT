@@ -1,0 +1,75 @@
+<div class="modal modal--notas modal--centrado" role="presentation" (mousedown)="$event.target === $event.currentTarget && cerrar.emit()">
+  <div
+    class="modal__panel dialogo-notas"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="pp-t"
+    appModal
+    (cerrarModal)="cerrar.emit()"
+  >
+    <h2 id="pp-t" class="dialogo-notas__titulo">{{ modificando() ? 'Modificar prórroga' : 'Dar prórroga' }}</h2>
+
+    <dl class="ficha-notas">
+      <dt>Profesor</dt><dd class="ficha-notas__fuerte">{{ asignacion().profesor.nombre }}</dd>
+      <dt>Asignación</dt><dd>{{ ficha().asignacion }}</dd>
+      <dt>Cierre general</dt><dd class="notas-num">{{ ficha().general }}</dd>
+    </dl>
+
+    <div class="campo-notas">
+      <span id="pp-l" class="campo-notas__rotulo">Nueva fecha y hora límite <span class="campo-notas__obligatorio" aria-hidden="true">*</span></span>
+      <div class="fecha-hora" role="group" aria-labelledby="pp-l">
+        <input
+          type="date"
+          aria-label="Fecha"
+          class="fecha-hora__fecha fecha-hora--grande"
+          [class.fecha-hora--error]="(tocada() && ayudaFecha().error) || errores().fecha"
+          [value]="fecha()"
+          (change)="cambiar('fecha', $any($event.target).value)"
+        />
+        <input
+          type="time"
+          aria-label="Hora"
+          class="fecha-hora__hora fecha-hora--grande"
+          [class.fecha-hora--error]="(tocada() && ayudaFecha().error) || errores().fecha"
+          [value]="hora()"
+          (change)="cambiar('hora', $any($event.target).value)"
+        />
+      </div>
+      <span class="campo-notas__ayuda" [class.campo-notas__ayuda--error]="(tocada() && ayudaFecha().error) || errores().fecha">
+        {{ errores().fecha ?? ayudaFecha().texto }}
+      </span>
+    </div>
+
+    <div class="campo-notas">
+      <label class="campo-notas__rotulo" for="pp-m">Motivo <span class="campo-notas__obligatorio" aria-hidden="true">*</span></label>
+      <textarea
+        id="pp-m"
+        class="campo-notas__texto"
+        [class.campo-notas__texto--error]="errores().motivo"
+        rows="2"
+        maxlength="300"
+        placeholder="Ej.: sin señal en la vereda la semana del cierre"
+        [value]="motivo()"
+        (input)="escribirMotivo($any($event.target).value)"
+      ></textarea>
+      @if (errores().motivo; as e) {
+        <span class="campo-notas__error" role="alert">✕ {{ e }}</span>
+      }
+    </div>
+
+    <p class="dialogo-notas__nota">
+      Autoriza: <strong>{{ quien()?.nombreCompleto }}</strong>. Solo vale para esta asignación y este período.
+    </p>
+
+    @if (errorGeneral(); as m) {
+      <p class="dialogo-notas__error" role="alert">✕ {{ m }}</p>
+    }
+
+    <div class="dialogo-notas__botones">
+      <button type="button" class="boton boton--neutro" (click)="cerrar.emit()">Cancelar</button>
+      <button type="button" class="boton boton--primario boton--grande" [disabled]="guardando() || !enLinea()" (click)="guardar()">
+        {{ guardando() ? 'Guardando…' : modificando() ? 'Guardar prórroga' : 'Dar prórroga' }}
+      </button>
+    </div>
+  </div>
+</div>

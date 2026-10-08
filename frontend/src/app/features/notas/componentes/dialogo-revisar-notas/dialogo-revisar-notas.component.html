@@ -1,0 +1,59 @@
+<div class="modal modal--notas modal--centrado" role="presentation" (mousedown)="$event.target === $event.currentTarget && cerrar.emit()">
+  <div
+    class="modal__panel dialogo-notas dialogo-notas--con-scroll"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="rv-t"
+    appModal
+    (cerrarModal)="cerrar.emit()"
+  >
+    <div class="dialogo-notas__cabecera">
+      <h2 id="rv-t" class="dialogo-notas__titulo">Revisa antes de guardar</h2>
+      <p class="dialogo-notas__subtitulo">{{ subtitulo() }}</p>
+    </div>
+
+    <div class="dialogo-notas__cuerpo">
+      <ul class="revision__lista">
+        @for (f of filas(); track f.estudianteId) {
+          <li class="revision__fila">
+            <span class="revision__nombre">{{ f.nombre }}</span>
+            <span class="revision__valor notas-num">{{ f.texto }}</span>
+            <span class="chip-desempeno chip-desempeno--chico" [attr.data-tono]="f.desempeno.tono">
+              <span class="chip-desempeno__icono" aria-hidden="true">{{ f.desempeno.icono }}</span>{{ f.desempeno.texto }}
+            </span>
+          </li>
+        }
+      </ul>
+
+      @if (observacion()) {
+        <p class="dialogo-notas__nota">{{ observacion() }}</p>
+      }
+
+      <div class="aviso-amarillo">
+        <span class="aviso-amarillo__icono" aria-hidden="true">!</span>
+        <span><strong>Estas notas no se podrán modificar después.</strong> Si hay un error, solo coordinación puede corregirlas.</span>
+      </div>
+
+      @if (!enLinea()) {
+        <p class="dialogo-notas__error" role="alert">
+          ✕ Sin conexión: no se puede guardar ahora. Tus notas siguen guardadas en este equipo como borrador.
+        </p>
+      }
+      @if (error(); as e) {
+        <p class="dialogo-notas__error" role="alert">✕ {{ e }}</p>
+      }
+    </div>
+
+    <div class="dialogo-notas__pie">
+      <button type="button" class="boton boton--neutro" (click)="cerrar.emit()">Volver a revisar</button>
+      <button
+        type="button"
+        class="boton boton--primario boton--grande"
+        [disabled]="!enLinea() || guardando()"
+        (click)="guardar()"
+      >
+        {{ textoBoton() }}
+      </button>
+    </div>
+  </div>
+</div>

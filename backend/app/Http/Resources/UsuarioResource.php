@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Los datos del usuario conectado que la barra superior necesita mostrar.
  * Claves en camelCase a propósito: coinciden 1:1 con
  * `frontend/src/app/core/interfaces/usuario.interface.ts`, así Angular no
- * traduce snake_case (mismo criterio que NotaResource).
+ * traduce snake_case.
  *
  * `password_hash` no aparece por dos razones independientes, y las dos
  * hacen falta: este Resource arma la respuesta campo por campo, y el
