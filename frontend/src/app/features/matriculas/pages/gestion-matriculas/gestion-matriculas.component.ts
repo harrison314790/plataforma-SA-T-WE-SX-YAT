@@ -1,6 +1,6 @@
 import { TitleCasePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import type { AccionDeModulo } from '../../../../core/interfaces/asignacion.interface';
 import type {
@@ -453,6 +453,21 @@ export class GestionMatriculasComponent {
     this.leerUrl();
     void this.cargar();
 
+    // La URL sigue a los filtros, no solo a la pestaña y el año: antes,
+    // la búsqueda, la sede, el grado y el estado se perdían al recargar o
+    // al compartir el enlace (AUDITORIA-2026-10-07.md, M6). Un efecto en
+    // vez de una llamada en cada setter: hay seis lugares que cambian
+    // filtros y bastaba olvidar uno para que la URL dejara de decir la
+    // verdad.
+    effect(() => {
+      this.pestana();
+      this.anio();
+      this.f1();
+      this.f2();
+      this.opciones();
+      untracked(() => this.escribirUrl());
+    });
+
     // El menú es `position: fixed`: si la página se desplaza, quedaría
     // flotando sobre otra fila. Se cierra (mismo criterio que Usuarios).
     const alDesplazar = () => this.cerrarMenu();
@@ -547,14 +562,49 @@ export class GestionMatriculasComponent {
     if (p.get('pestana') === 'matriculados') this.pestana.set('mt');
     const anio = Number(p.get('anio'));
     if (Number.isInteger(anio) && anio > 0) this.anio.set(anio);
+
+    // Un parámetro escrito a mano con un valor raro se ignora: la pantalla
+    // nunca queda en un estado que sus propios controles no pueden mostrar.
+    const texto = (clave: string): string => p.get(clave) ?? '';
+    const resultado = texto('presultado');
+    const estado = texto('mestado');
+
+    this.f1.set({
+      q: texto('pq'),
+      sede: texto('psede'),
+      gradoGrupo: texto('pcurso'),
+      resultado: resultado === 'A' || resultado === 'N' || resultado === 'P' ? resultado : '',
+      vista: texto('pvista') === 'graduados' ? 'graduados' : 'pendientes',
+    });
+    this.f2.set({
+      q: texto('mq'),
+      sede: texto('msede'),
+      grado: texto('mgrado'),
+      grupo: texto('mgrupo'),
+      estado: estado === 'activa' || estado === 'retirada' ? estado : FILTROS_MATRICULADOS.estado,
+    });
   }
 
   private escribirUrl(): void {
+    const f1 = this.f1();
+    const f2 = this.f2();
     void this.router.navigate([], {
       relativeTo: this.ruta,
+      // `null` quita el parámetro: la URL lleva solo lo que se apartó del
+      // valor por defecto, para que un enlace compartido se lea fácil.
       queryParams: {
         pestana: this.pestana() === 'mt' ? 'matriculados' : null,
         anio: this.anio() !== this.opciones()?.anioSugerido ? this.anio() : null,
+        pq: f1.q || null,
+        psede: f1.sede || null,
+        pcurso: f1.gradoGrupo || null,
+        presultado: f1.resultado || null,
+        pvista: f1.vista === 'graduados' ? 'graduados' : null,
+        mq: f2.q || null,
+        msede: f2.sede || null,
+        mgrado: f2.grado || null,
+        mgrupo: f2.grupo || null,
+        mestado: f2.estado !== FILTROS_MATRICULADOS.estado ? f2.estado : null,
       },
       replaceUrl: true,
     });

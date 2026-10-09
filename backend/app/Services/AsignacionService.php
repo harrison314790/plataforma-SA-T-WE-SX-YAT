@@ -228,14 +228,11 @@ class AsignacionService
             ->values()
             ->all();
 
-        $activo = PeriodoAcademico::query()
-            ->where('activo', true)
-            ->orderByDesc('anio')->orderByDesc('numero')
-            ->value('anio');
-
         return [
             'disponibles' => $anios,
-            'anioSugerido' => $activo !== null ? (int) $activo : ($anios[0] ?? null),
+            // Por fecha (22-epocas-por-fecha.sql): ya no hay columna
+            // `periodos_academicos.activo` que consultar.
+            'anioSugerido' => $anios ? PeriodoAcademico::anioEscolarActual() : null,
         ];
     }
 
@@ -261,7 +258,27 @@ class AsignacionService
 
     public function actualizar(Asignacion $asignacion, array $datos): Asignacion
     {
-        $asignacion->update([
+        // Con notas, solo se puede cambiar el PROFESOR (reemplazo de
+        // docente). Mover la asignación a otro curso, materia o año dejaba
+        // sus notas colgando de algo que no calificaron: las de 9-B en
+        // 8-A, las de Español contando como Matemáticas. La base lo
+        // garantiza también (trigger de 24-correcciones-auditoria.sql);
+        // acá se adelanta para dar el mensaje.
+        $cambiaCurso = (int) $asignacion->asignatura_id !== (int) $datos['asignatura_id']
+            || (int) $asignacion->sede_id !== (int) $datos['sede_id']
+            || (int) $asignacion->grado !== (int) $datos['grado']
+            || $asignacion->grupo !== $datos['grupo']
+            || (int) $asignacion->anio !== (int) $datos['anio'];
+
+        if ($cambiaCurso && $asignacion->notas()->exists()) {
+            throw new ErrorDeNegocio(
+                'Esta asignación ya tiene notas: no se puede cambiar de curso, materia ni año. Sí se puede cambiar el profesor, o desactivarla y crear una nueva.'
+            );
+        }
+
+        // Por query y no `$asignacion->update()`: un UPDATE que RLS rechaza
+        // afecta 0 filas sin fallar, y Eloquent respondería "guardado".
+        $afectadas = Asignacion::query()->whereKey($asignacion->getKey())->update([
             'profesor_id' => $datos['profesor_id'],
             'asignatura_id' => $datos['asignatura_id'],
             'sede_id' => $datos['sede_id'],
@@ -270,7 +287,11 @@ class AsignacionService
             'anio' => $datos['anio'],
         ]);
 
-        return $this->conRelaciones($asignacion);
+        if ($afectadas === 0) {
+            throw new ErrorDeNegocio('No se pudo guardar la asignación: tu cuenta no tiene permiso sobre ella.');
+        }
+
+        return $this->conRelaciones($asignacion->refresh());
     }
 
     /**
@@ -280,9 +301,13 @@ class AsignacionService
      */
     public function cambiarEstado(Asignacion $asignacion, bool $activo): Asignacion
     {
-        $asignacion->update(['activo' => $activo]);
+        $afectadas = Asignacion::query()->whereKey($asignacion->getKey())->update(['activo' => $activo]);
 
-        return $this->conRelaciones($asignacion);
+        if ($afectadas === 0) {
+            throw new ErrorDeNegocio('No se pudo cambiar el estado de la asignación: tu cuenta no tiene permiso.');
+        }
+
+        return $this->conRelaciones($asignacion->refresh());
     }
 
     /**

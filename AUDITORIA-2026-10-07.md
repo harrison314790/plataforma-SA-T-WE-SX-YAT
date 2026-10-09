@@ -1,5 +1,53 @@
 # Auditoría del sistema académico — 2026-10-07
 
+## Estado (segunda ronda): todo corregido y verificado
+
+Todos los hallazgos están corregidos. Un script reproduce cada uno contra la API y la base real: **30 de 30 verificaciones pasan**. Sobre el código corregido repetí la matriz de permisos, las reglas de Notas, Usuarios y el recálculo del boletín (8 casos, 0 diferencias), sin regresiones.
+
+| # | Corrección | Dónde |
+|---|---|---|
+| C1 | Una asignación con notas no cambia de curso, materia ni año (Laravel + trigger + formulario bloqueado). Cambiar solo el profesor sí se permite | `AsignacionService::actualizar`, `24-correcciones-auditoria.sql`, `formulario-asignacion` |
+| C2 | Una asignación por materia+curso+año, **sin el profesor** en la llave | `24`, `AsignacionRequest::reglaDeUnicidad` |
+| C3 | Sin política ni privilegio DELETE en `notas`; tampoco UPDATE/DELETE en `historial_notas` | `24` |
+| A1 | `/asignaciones/opciones` usa `anioEscolarActual()` | `AsignacionService.php` |
+| A2 | Login: 5 intentos/min por correo+IP y 60/min por IP, 429 en español | `AppServiceProvider`, `routes/api.php` |
+| M1 | Asignación desactivada → 422 claro | `NotaService::registrarLote` |
+| M2 | Token de usuario inactivo → 401 y se revocan **todos** sus tokens | `EstablecerUsuarioActual` + `fn_usuario_activo` |
+| M3 | `whereNumber` en rutas y reglas con consulta solo con tipos válidos | `routes/api.php`, `AsignacionRequest` |
+| M4 | Correo sin distinguir mayúsculas (Laravel y función de login) | `LoginRequest`, `24` |
+| M5 | Fechas de matrícula y retiro con la fecha de Colombia | `MatriculaService` |
+| M6 | Filtros de Matrículas y Seguimiento de notas en la URL | `gestion-matriculas`, `seguimiento-notas` |
+| M7 | Épocas sembradas con fechas fijas | `03-datos-prueba.sql` |
+| M8 | Corrección con bloqueo de fila y `valor_anterior`: si cambió, 422 | `NotaService::corregir`, `CorregirNotaRequest`, diálogo |
+| B1–B2 | Mensajes de validación completos y sin problemas de concordancia | `lang/es/validation.php` |
+| B3 | Grupo de la oferta: solo letras y números | `CrearOfertaGradoRequest` |
+| B4 | Recurso huérfano `btn_exportar_notas` eliminado | `24` |
+| B5 | **No aplica**: todas las peticiones usan la misma conexión `app_user`, así que la base no puede distinguir quién lee la tabla de tokens. Solo sería explotable con una inyección SQL; la mitigación real es que Sanctum guarda hashes | — |
+| B6 | Los `update` cuentan filas y lanzan error si RLS dejó 0 | `NotaPeriodoService`, `AsignacionService`, `NotaService` |
+| B7 | 21 y 22 documentados como "correr una vez"; 24 es idempotente | encabezados |
+| B8 | `diasRestantes` = días completos, como la banda del módulo | `PeriodoActivoResource` |
+| B9 | `promedioGeneral` vacío si el año no tiene épocas | `BoletinService` |
+| B10 | El permiso se revisa antes de resolver el modelo de la ruta (403, no 404) | `bootstrap/app.php` |
+
+### Encontrado en la segunda ronda (pensando en producción) y corregido
+
+- **Errores HTTP convertidos en 500:** el atrapa-todo del manejador de errores transformaba un 429 o un 405 en "Error interno". Ahora salen con su código real y un mensaje en español.
+- **Logs duplicados y con ruido:** cada error se registraba dos veces, y cada "Correo o contraseña incorrectos" quedaba como ERROR. Ahora `ErrorDeNegocio` no va al log y se quitó el doble reporte. En producción esto habría llenado el disco y escondido los errores reales.
+- **Tokens que no vencían:** `sanctum.expiration` era `null`. Ahora vencen a las 12 h (`SANCTUM_EXPIRATION`) y se limpian una vez al día (`routes/console.php`).
+- **Sin forma de restablecer una contraseña olvidada:** coordinación ahora lo hace desde Usuarios → editar → "Restablecer contraseña". Cierra las sesiones de esa persona.
+- **Dependencias:** `composer audit` señalaba Laravel 12.68 (XSS en la página de debug) y league/commonmark. Actualicé a Laravel 12.69.3 y commonmark 2.10.3: 0 avisos.
+- **Angular 18 sin soporte:** sus avisos de seguridad se corrigen en Angular 20 o 21. Ninguno afecta lo que usa la app (no hay i18n, SSR, `innerHTML` ni caché de hidratación). Queda como recomendación antes del uso amplio.
+- **Despliegue:**
+  - Los scripts 01→24 corren limpios sobre una base vacía, y el esquema resultante es idéntico al de desarrollo.
+  - `php artisan migrate` necesita el superusuario: `app_user` no puede crear tablas, por diseño.
+  - Las personas de prueba se borran con el nuevo `25-preparar-piloto.sql`.
+  - Las épocas de un año nuevo se crean con `26-crear-anio-escolar.sql`.
+  - Recorrí el **piloto completo desde una base vacía**, y todo pasó.
+
+Ver `DESPLIEGUE.md`.
+
+---
+
 **Alcance:** login/sesión, Notas (registro y seguimiento), Asignaciones + Oferta de grados, Nudos y materias, Porcentajes, Boletines, Usuarios y Matrículas.
 
 **Método:** Postgres real en Docker (`mi-postgres`), Laravel y Angular levantados. Hice peticiones reales con un token Sanctum de cada rol (super_admin, admin, dos profesores, dos estudiantes) y sin token. Después de cada escritura verifiqué la base con SQL directo: como `postgres` para ver el dato real, y como `app_user` con `app.usuario_id` seteado para probar RLS sin falsos positivos. Además revisé el código Angular de cada formulario. Los scripts de prueba están en el scratchpad de la sesión; no forman parte del repo.

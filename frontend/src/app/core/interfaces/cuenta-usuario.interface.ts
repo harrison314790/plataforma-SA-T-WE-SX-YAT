@@ -76,4 +76,6 @@ export interface CuentaParaActualizar {
   email: string;
   sede_id?: number;
   activo: boolean;
+  /** Solo si coordinación restablece la contraseña. */
+  password?: string;
 }

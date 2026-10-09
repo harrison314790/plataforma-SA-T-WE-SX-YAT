@@ -94,7 +94,7 @@ export class DialogoCorregirNotaComponent {
     this.guardando.set(true);
     this.errorGeneral.set(null);
     try {
-      this.corregida.emit(await this.servicio.corregir(this.datos().nota.id, l.valor, this.motivo().trim()));
+      this.corregida.emit(await this.servicio.corregir(this.datos().nota.id, l.valor, this.motivo().trim(), this.datos().nota.valor));
     } catch (err) {
       const det = detallesDeError(err);
       if (det['valor'] || det['motivo']) this.errores.set({ valor: det['valor']?.[0], motivo: det['motivo']?.[0] });

@@ -77,6 +77,10 @@ class CrearOfertaGradoRequest extends FormRequest
                 'string',
                 // 10 caracteres alcanzan para 'A' y para 'UNICO'.
                 'max:10',
+                // Solo letras y números, sin espacios: el grupo se pinta en
+                // "9-B" y se compara letra por letra con matrículas y
+                // asignaciones. Antes entraba "B C!".
+                'regex:/^[A-Z0-9]+$/',
                 $this->reglaDeDuplicado(),
             ],
         ];
@@ -117,5 +121,12 @@ class CrearOfertaGradoRequest extends FormRequest
                     : "Esa sede ya tiene el grado {$existente->grado} grupo {$existente->grupo}, pero está DESACTIVADO. Reactivalo desde la lista de abajo en vez de crearlo de nuevo: así el historial de asignaciones y matrículas que ya tiene sigue sirviendo."
             );
         };
+    }
+
+    public function messages(): array
+    {
+        return [
+            'grupo.regex' => 'El grupo lleva solo letras o números, sin espacios: A, B, UNICO…',
+        ];
     }
 }

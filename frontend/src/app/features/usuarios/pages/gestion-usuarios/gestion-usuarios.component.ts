@@ -124,7 +124,7 @@ export class GestionUsuariosComponent {
   protected readonly errorDelFormulario = signal<string | null>(null);
 
   /** La cuenta recién creada y su contraseña: lo único que la muestra. */
-  protected readonly creada = signal<{ cuenta: CuentaUsuario; contrasena: string } | null>(null);
+  protected readonly creada = signal<{ cuenta: CuentaUsuario; contrasena: string; restablecida?: boolean } | null>(null);
 
   protected readonly enBorrado = signal<CuentaUsuario | null>(null);
   protected readonly errorDelBorrado = signal<string | null>(null);
@@ -410,7 +410,10 @@ export class GestionUsuariosComponent {
         const cuenta = await this.servicio.actualizar(previa.id, guardado.datos);
         this.cerrarFormulario();
 
-        if (previa.activo && !cuenta.activo) {
+        if (guardado.datos.password) {
+          // Misma ventana que al crear: la contraseña se ve una sola vez.
+          this.creada.set({ cuenta, contrasena: guardado.datos.password, restablecida: true });
+        } else if (previa.activo && !cuenta.activo) {
           this.avisar('neutral', `Cuenta de ${cuenta.nombreCompleto} desactivada. Ya no podrá iniciar sesión; sus datos se conservan.`);
         } else if (!previa.activo && cuenta.activo) {
           this.avisar('ok', `Cuenta de ${cuenta.nombreCompleto} activada de nuevo.`);
@@ -435,7 +438,11 @@ export class GestionUsuariosComponent {
   protected cerrarCreada(): void {
     const creada = this.creada();
     this.creada.set(null);
-    if (creada !== null) this.avisar('ok', `Cuenta de ${creada.cuenta.nombreCompleto} creada.`);
+    if (creada !== null) {
+      this.avisar('ok', creada.restablecida
+        ? `Contraseña de ${creada.cuenta.nombreCompleto} restablecida.`
+        : `Cuenta de ${creada.cuenta.nombreCompleto} creada.`);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────

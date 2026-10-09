@@ -32,6 +32,19 @@ class ActualizarUsuarioRequest extends UsuarioRequest
         return [
             ...parent::rules(),
             'activo' => ['required', 'boolean'],
+
+            // Restablecer la contraseña: opcional. Si no viene, la actual no
+            // se toca. Mismos límites que al crear (8 a 72: bcrypt ignora
+            // lo que pase de 72 bytes).
+            'password' => ['sometimes', 'nullable', 'string', 'min:8', 'max:72'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            ...parent::messages(),
+            'password.min' => 'Mínimo 8 caracteres. Usa “Generar” si prefieres.',
         ];
     }
 }

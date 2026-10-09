@@ -1,6 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import type {
   AvanceAsignacion,
   CalendarioGuardado,
@@ -117,6 +118,8 @@ export class SeguimientoNotasComponent {
   private readonly servicio = inject(NotasService);
   private readonly conexion = inject(ConexionService);
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly ruta = inject(ActivatedRoute);
 
   protected readonly enLinea = this.conexion.enLinea;
   protected readonly plural = plural;
@@ -153,7 +156,64 @@ export class SeguimientoNotasComponent {
   constructor() {
     const id = window.setInterval(() => this.tic.update((n) => n + 1), 30_000);
     inject(DestroyRef).onDestroy(() => window.clearInterval(id));
-    void this.cargar(null);
+
+    // Filtros, orden, vista y época en la URL: se restauran al recargar y
+    // se pueden compartir ("mira lo que le falta a 9-B"). Antes se perdían
+    // (AUDITORIA-2026-10-07.md, M6). La época va solo si se eligió una
+    // distinta de la activa; sin ella, el backend abre la activa.
+    const epoca = this.leerUrl();
+    void this.cargar(epoca);
+
+    effect(() => {
+      this.filtros();
+      this.orden();
+      this.vista();
+      this.datos();
+      untracked(() => this.escribirUrl());
+    });
+  }
+
+  private leerUrl(): number | null {
+    const p = this.ruta.snapshot.queryParamMap;
+    const texto = (clave: string): string => p.get(clave) ?? '';
+    const estado = texto('estado');
+    this.filtros.set({
+      sede: texto('sede'),
+      curso: texto('curso'),
+      profesor: texto('profesor'),
+      materia: texto('materia'),
+      estado: (['completa', 'parcial', 'sin', 'prorroga'] as const).find((e) => e === estado) ?? '',
+    });
+    const orden = texto('orden');
+    if (orden === 'profesor' || orden === 'ultima') {
+      this.orden.set({ clave: orden, dir: texto('dir') === 'desc' ? -1 : 1 });
+    } else if (texto('dir') === 'desc') {
+      this.orden.set({ clave: 'avance', dir: -1 });
+    }
+    if (texto('vista') === 'profesor') this.vista.set('profesor');
+    const epoca = Number(texto('epoca'));
+    return Number.isInteger(epoca) && epoca > 0 ? epoca : null;
+  }
+
+  private escribirUrl(): void {
+    const f = this.filtros();
+    const o = this.orden();
+    const periodo = this.periodo();
+    void this.router.navigate([], {
+      relativeTo: this.ruta,
+      queryParams: {
+        epoca: periodo && periodo.estado !== 'activo' ? periodo.id : null,
+        sede: f.sede || null,
+        curso: f.curso || null,
+        profesor: f.profesor || null,
+        materia: f.materia || null,
+        estado: f.estado || null,
+        orden: o.clave !== 'avance' ? o.clave : null,
+        dir: o.dir === -1 ? 'desc' : null,
+        vista: this.vista() === 'profesor' ? 'profesor' : null,
+      },
+      replaceUrl: true,
+    });
   }
 
   // ─────────────────────────────────────────────────────────────

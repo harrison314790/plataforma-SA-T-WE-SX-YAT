@@ -69,6 +69,8 @@ export class FormularioUsuarioComponent {
   protected readonly emailTocado = signal(false);
   protected readonly sedeId = signal<number | null>(null);
   protected readonly contrasena = signal(generarContrasena());
+  /** En edición: ¿coordinación decidió restablecer la contraseña? */
+  protected readonly restablecer = signal(false);
   protected readonly activo = signal(true);
 
   /** Errores de la validación local, que se calculan solo al intentar guardar. */
@@ -193,6 +195,16 @@ export class FormularioUsuarioComponent {
     this.limpiarError('password');
   }
 
+  protected empezarRestablecer(): void {
+    this.contrasena.set(generarContrasena());
+    this.restablecer.set(true);
+  }
+
+  protected cancelarRestablecer(): void {
+    this.restablecer.set(false);
+    this.limpiarError('password');
+  }
+
   protected alternarActivo(): void {
     this.activo.update((valor) => !valor);
   }
@@ -220,7 +232,7 @@ export class FormularioUsuarioComponent {
       errores['email'] = 'Escribe un email válido, por ejemplo nombre@dominio.edu.co.';
     }
     if (this.esProfesor() && sedeId === null) errores['sede_id'] = 'Elige la sede.';
-    if (!this.esEdicion() && contrasena.length < 8) {
+    if ((!this.esEdicion() || this.restablecer()) && contrasena.length < 8) {
       errores['password'] = 'Mínimo 8 caracteres. Usa “Generar” si prefieres.';
     }
 
@@ -232,7 +244,10 @@ export class FormularioUsuarioComponent {
     if (this.esEdicion()) {
       this.guardar.emit({
         modo: 'edicion',
-        datos: { nombres, apellidos, documento, email, activo: this.activo(), ...sede },
+        datos: {
+          nombres, apellidos, documento, email, activo: this.activo(), ...sede,
+          ...(this.restablecer() ? { password: contrasena } : {}),
+        },
       });
     } else {
       this.guardar.emit({

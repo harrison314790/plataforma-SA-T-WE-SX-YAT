@@ -220,15 +220,20 @@ class NotaPeriodoService
             throw new ErrorDeNegocio("La época {$periodo->nombre} no está activa hoy: su plazo solo se cambia mientras está en curso.");
         }
 
+        $cambios = [];
+
         if (array_key_exists('notas_habilitadas', $datos)) {
-            $periodo->notas_habilitadas = (bool) $datos['notas_habilitadas'];
+            $cambios['notas_habilitadas'] = (bool) $datos['notas_habilitadas'];
         }
 
         if (array_key_exists('fecha_limite_notas', $datos)) {
-            $periodo->fecha_limite_notas = $this->instante($datos['fecha_limite_notas']);
+            $cambios['fecha_limite_notas'] = $this->instante($datos['fecha_limite_notas']);
         }
 
-        $periodo->save();
+        $this->exigirFilas(
+            PeriodoAcademico::query()->whereKey($periodo->getKey())->update($cambios),
+            'No se pudo cambiar el plazo: tu cuenta no tiene permiso sobre los períodos.'
+        );
 
         return $this->periodoParaPantalla($periodo->refresh());
     }
@@ -301,7 +306,11 @@ class NotaPeriodoService
 
         foreach ($periodos as $p) {
             $f = $fechas->get($p->id);
-            $p->update(['fecha_inicio' => $f['fecha_inicio'], 'fecha_fin' => $f['fecha_fin']]);
+            $this->exigirFilas(
+                PeriodoAcademico::query()->whereKey($p->getKey())
+                    ->update(['fecha_inicio' => $f['fecha_inicio'], 'fecha_fin' => $f['fecha_fin']]),
+                'No se pudo guardar el calendario: tu cuenta no tiene permiso sobre las épocas.'
+            );
         }
 
         $activa = PeriodoAcademico::actual();
@@ -354,12 +363,15 @@ class NotaPeriodoService
             ->first();
 
         if ($existente) {
-            $existente->update([
-                'fecha_limite_extendida' => $hasta,
-                'motivo' => $datos['motivo'],
-                'autorizado_por' => $usuarioId,
-                'actualizada_en' => now(),
-            ]);
+            $this->exigirFilas(
+                ExcepcionPlazo::query()->whereKey($existente->getKey())->update([
+                    'fecha_limite_extendida' => $hasta,
+                    'motivo' => $datos['motivo'],
+                    'autorizado_por' => $usuarioId,
+                    'actualizada_en' => now(),
+                ]),
+                'No se pudo modificar la prórroga: tu cuenta no tiene permiso.'
+            );
         } else {
             ExcepcionPlazo::create([
                 'profesor_id' => $asignacion->profesor_id,
@@ -381,7 +393,24 @@ class NotaPeriodoService
             throw new ErrorDeNegocio('Esa prórroga ya se había quitado.');
         }
 
-        $prorroga->update(['revocada_en' => now(), 'revocada_por' => $usuarioId]);
+        $this->exigirFilas(
+            ExcepcionPlazo::query()->whereKey($prorroga->getKey())->whereNull('revocada_en')
+                ->update(['revocada_en' => now(), 'revocada_por' => $usuarioId]),
+            'No se pudo quitar la prórroga (puede que otra persona ya la haya quitado). Recarga la página.'
+        );
+    }
+
+    /**
+     * Un UPDATE que RLS rechaza no falla: afecta 0 filas y Eloquent
+     * responde como si todo hubiera salido bien. Cada escritura de este
+     * service cuenta las filas y lo convierte en un error legible, en vez
+     * de un "guardado" falso.
+     */
+    private function exigirFilas(int $afectadas, string $mensaje): void
+    {
+        if ($afectadas === 0) {
+            throw new ErrorDeNegocio($mensaje);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────

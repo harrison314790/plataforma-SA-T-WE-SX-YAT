@@ -12,6 +12,18 @@ class LoginRequest extends FormRequest
         return true;
     }
 
+    /**
+     * Los correos se guardan en minúsculas (UsuarioRequest). Sin esto, el
+     * teclado del celular -- que pone la primera letra en mayúscula -- hacía
+     * fallar el login con "Correo o contraseña incorrectos".
+     */
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->input('email'))) {
+            $this->merge(['email' => mb_strtolower(trim($this->input('email')))]);
+        }
+    }
+
     public function rules(): array
     {
         return [

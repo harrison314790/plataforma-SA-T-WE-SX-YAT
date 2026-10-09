@@ -54,6 +54,25 @@ class EstablecerUsuarioActual
             return $next($request);
         }
 
+        // ¿El dueño del token sigue activo? Desactivar desde la pantalla de
+        // Usuarios ya borra sus tokens, pero si la cuenta se desactiva por
+        // otro camino (un script, un endpoint futuro) el token seguía
+        // sirviendo. `fn_usuario_activo` es SECURITY DEFINER porque acá
+        // todavía no hay `app.usuario_id` y RLS no dejaría leer la fila
+        // (24-correcciones-auditoria.sql). Si está inactivo, se revoca el
+        // token y NO se arma el contexto: auth:sanctum no puede leer la
+        // fila del usuario y responde 401 por su cuenta.
+        if (! DB::selectOne('select fn_usuario_activo(?) as activo', [$token->tokenable_id])->activo) {
+            // Todos sus tokens, no solo este: una cuenta desactivada no
+            // debe dejar sesiones vivas en otros equipos.
+            PersonalAccessToken::query()
+                ->where('tokenable_type', $token->tokenable_type)
+                ->where('tokenable_id', $token->tokenable_id)
+                ->delete();
+
+            return $next($request);
+        }
+
         // Transacción manual y no `DB::transaction(fn...)`, y no es estilo:
         // el pipeline de rutas de Laravel atrapa las excepciones del
         // controlador y las convierte en respuesta (422, 403...) ANTES de

@@ -272,7 +272,11 @@ class BoletinService
      */
     private function promediosGenerales(Collection $nudos, int $totalPeriodos): array
     {
-        return collect(range(0, max($totalPeriodos - 1, 0)))
+        if ($totalPeriodos === 0) {
+            return [];   // año sin épocas creadas todavía: nada que promediar
+        }
+
+        return collect(range(0, $totalPeriodos - 1))
             ->map(function (int $i) use ($nudos) {
                 $notas = $nudos->map(fn ($n) => $n['periodos'][$i]['nota'] ?? null)->filter(fn ($v) => $v !== null);
 

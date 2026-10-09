@@ -349,7 +349,7 @@
 }
 
 @if (creada(); as c) {
-  <app-dialogo-cuenta-creada [cuenta]="c.cuenta" [contrasena]="c.contrasena" (cerrar)="cerrarCreada()" />
+  <app-dialogo-cuenta-creada [cuenta]="c.cuenta" [contrasena]="c.contrasena" [restablecida]="c.restablecida ?? false" (cerrar)="cerrarCreada()" />
 }
 
 @if (enBorrado(); as cuenta) {

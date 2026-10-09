@@ -129,7 +129,18 @@
         </label>
       }
 
-      @if (!esEdicion()) {
+      @if (esEdicion() && !restablecer()) {
+        <!-- Para el profesor que olvidó su contraseña: antes no había
+             ninguna salida desde la pantalla. -->
+        <div class="campo">
+          <button type="button" class="boton boton--secundario" (click)="empezarRestablecer()">
+            <app-icono nombre="candado" [tamano]="16" />
+            Restablecer contraseña
+          </button>
+        </div>
+      }
+
+      @if (!esEdicion() || restablecer()) {
         <!-- Contraseña inicial: ya viene generada al abrir. Se ve en claro
              a propósito: quien la escribe es quien la va a entregar. -->
         <div class="bloque-contrasena">
@@ -139,7 +150,7 @@
           <div class="campo">
             <label class="campo__rotulo campo__rotulo--con-icono" for="cuenta-contrasena">
               <app-icono nombre="candado" [tamano]="16" />
-              Contraseña inicial <span class="campo__obligatorio" aria-hidden="true">*</span>
+              {{ esEdicion() ? 'Contraseña nueva' : 'Contraseña inicial' }} <span class="campo__obligatorio" aria-hidden="true">*</span>
             </label>
             <span class="bloque-contrasena__fila">
               <input
@@ -164,11 +175,17 @@
             } @else {
               <span class="campo__ayuda">
                 Mínimo 8 caracteres. Al terminar te la mostramos una sola vez para que la entregues.
+                @if (esEdicion()) { Las sesiones abiertas de esta persona se cierran. }
               </span>
+            }
+            @if (esEdicion()) {
+              <button type="button" class="boton-enlace" (click)="cancelarRestablecer()">No cambiar la contraseña</button>
             }
           </div>
         </div>
-      } @else {
+      }
+
+      @if (esEdicion()) {
         <!-- Toggle con su propio color: verde encendido, gris apagado. Y
              nunca solo color: la palabra "Activa"/"Inactiva" y el ✓ / – dentro
              del interruptor dicen lo mismo. -->

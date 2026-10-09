@@ -23,6 +23,8 @@ import { ModalDirective } from '../../../../shared/directivas/modal.directive';
 export class DialogoCuentaCreadaComponent {
   readonly cuenta = input.required<CuentaUsuario>();
   readonly contrasena = input.required<string>();
+  /** `true` cuando coordinación restableció la contraseña de una cuenta existente. */
+  readonly restablecida = input(false);
 
   readonly cerrar = output<void>();
 

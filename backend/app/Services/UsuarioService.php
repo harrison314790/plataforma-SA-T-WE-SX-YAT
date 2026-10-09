@@ -149,12 +149,19 @@ class UsuarioService
             // La del estudiante no se toca desde acá (ver la regla
             // `prohibited` de UsuarioRequest).
             ...($esProfesor ? ['sede_id' => $datos['sede_id']] : []),
+            // Restablecer: el profesor que olvidó su contraseña no tenía
+            // ninguna salida. Solo coordinación la cambia, y se entrega en
+            // persona (la pantalla la muestra una vez).
+            ...(! empty($datos['password']) ? ['password_hash' => Hash::make($datos['password'])] : []),
         ]);
 
         ($esProfesor ? $usuario->profesor() : $usuario->estudiante())
             ->update(['activo' => $datos['activo']]);
 
-        if ($seDesactiva) {
+        // Con contraseña nueva también se cierran sus sesiones abiertas:
+        // si se restableció porque alguien más la conocía, esa persona no
+        // debe seguir adentro con su token anterior.
+        if ($seDesactiva || ! empty($datos['password'])) {
             $usuario->tokens()->delete();
         }
 

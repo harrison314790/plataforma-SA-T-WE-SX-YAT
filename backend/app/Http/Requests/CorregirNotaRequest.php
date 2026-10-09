@@ -14,6 +14,9 @@ class CorregirNotaRequest extends CoordinacionNotasRequest
         return [
             'valor' => ['required', 'numeric', 'between:1,5', 'decimal:0,1'],
             'motivo' => ['required', 'string', 'min:10', 'max:500'],
+            // El valor que la persona veía al abrir la corrección. Opcional
+            // para no romper clientes viejos; la pantalla siempre lo manda.
+            'valor_anterior' => ['sometimes', 'numeric', 'between:1,5'],
         ];
     }
 

@@ -32,11 +32,37 @@ return [
     'integer' => 'El campo :attribute debe ser un número entero.',
     'boolean' => 'El campo :attribute debe ser verdadero o falso.',
     'uuid' => 'El campo :attribute no es un identificador válido.',
-    'exists' => 'El :attribute seleccionado no existe.',
+    // Sin artículo: "El :attribute seleccionado" fallaba con los femeninos
+    // ("El asignación seleccionado no existe").
+    'exists' => 'La opción elegida en :attribute no existe.',
     'unique' => 'Ese :attribute ya está registrado.',
     'confirmed' => 'La confirmación de :attribute no coincide.',
     'date' => 'El campo :attribute no es una fecha válida.',
-    'in' => 'El :attribute seleccionado no es válido.',
+    'in' => 'La opción elegida en :attribute no es válida.',
+    'not_in' => 'La opción elegida en :attribute no es válida.',
+
+    // Reglas que los Form Requests ya usan y no tenían mensaje: sin ellas
+    // salía el texto en inglés de Laravel ("The nudo pedagogico id field
+    // must be present."). Ver AUDITORIA-2026-10-07.md, B1.
+    'array' => 'El campo :attribute debe ser una lista.',
+    'present' => 'Falta el campo :attribute.',
+    'distinct' => 'El campo :attribute está repetido.',
+    'decimal' => 'El campo :attribute admite como máximo :decimal decimales.',
+    'gt' => [
+        'numeric' => 'El campo :attribute debe ser mayor que :value.',
+    ],
+    'gte' => [
+        'numeric' => 'El campo :attribute debe ser mayor o igual que :value.',
+    ],
+    'after' => 'El campo :attribute debe ser una fecha posterior a :date.',
+    'after_or_equal' => 'El campo :attribute debe ser una fecha igual o posterior a :date.',
+    'before' => 'El campo :attribute debe ser una fecha anterior a :date.',
+    'date_format' => 'El campo :attribute no tiene el formato :format.',
+    'accepted' => 'Hay que aceptar :attribute.',
+    'prohibited' => 'El campo :attribute no se puede enviar aquí.',
+    'required_if' => 'El campo :attribute es obligatorio cuando :other es :value.',
+    'required_without' => 'El campo :attribute es obligatorio cuando no se envía :values.',
+    'regex' => 'El campo :attribute no tiene un formato válido.',
 
     'between' => [
         'numeric' => 'El campo :attribute debe estar entre :min y :max.',
@@ -89,6 +115,36 @@ return [
         'grupo' => 'grupo',
         'anio' => 'año',
         'activo' => 'estado',
+
+        // Campos dentro de listas: Laravel busca primero el nombre con
+        // comodín (notas.*.valor), así el mensaje dice "nota" y no
+        // "notas.0.valor".
+        'notas' => 'notas',
+        'notas.*.valor' => 'nota',
+        'notas.*.estudiante_id' => 'estudiante',
+        'estudiante_ids' => 'estudiantes',
+        'estudiante_ids.*' => 'estudiante',
+        'nudo_pedagogico_id' => 'nudo',
+        'nudos.*.nudo_id' => 'nudo',
+        'nudos.*.pesos' => 'porcentajes',
+        'nudos.*.pesos.*.asignatura_id' => 'materia',
+        'nudos.*.pesos.*.peso' => 'porcentaje',
+        'epocas.*.periodo_id' => 'época',
+        'epocas.*.fecha_inicio' => 'fecha de inicio',
+        'epocas.*.fecha_fin' => 'fecha de cierre',
+        'fecha_limite' => 'fecha límite',
+        'fecha_limite_notas' => 'fecha límite',
+        'notas_habilitadas' => 'carga de notas',
+        'valor_anterior' => 'valor anterior',
+        'motivo' => 'motivo',
+        'detalle' => 'detalle',
+        'codigo' => 'código',
+        'orden' => 'orden',
+        'nombre' => 'nombre',
+        'tipo' => 'tipo de cuenta',
+        'parentesco' => 'parentesco',
+        'telefono' => 'teléfono',
+        'confirmo' => 'la confirmación',
     ],
 
 ];

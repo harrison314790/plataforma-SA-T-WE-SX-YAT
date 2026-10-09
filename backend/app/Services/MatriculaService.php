@@ -54,7 +54,7 @@ class MatriculaService
         return [
             'anios' => $anios,
             'anioSugerido' => $anioActual,
-            'hoy' => now()->toDateString(),
+            'hoy' => PeriodoAcademico::hoy(),
             'sedes' => Sede::query()
                 ->orderByRaw("tipo <> 'principal'")
                 ->orderBy('nombre')
@@ -134,7 +134,7 @@ class MatriculaService
             'grupo' => $datos['grupo'],
             'acudiente_id' => $acudienteId,
             'estado' => 'activa',
-            'fecha_matricula' => now()->toDateString(),
+            'fecha_matricula' => PeriodoAcademico::hoy(),
         ]);
 
         return $this->matriculaParaPantalla($matricula->refresh());
@@ -164,7 +164,7 @@ class MatriculaService
                     'grado' => (int) $datos['grado'],
                     'grupo' => $datos['grupo'],
                     'estado' => 'activa',
-                    'fecha_matricula' => now()->toDateString(),
+                    'fecha_matricula' => PeriodoAcademico::hoy(),
                 ]);
 
                 return $this->matriculaParaPantalla($matricula->refresh());
@@ -206,7 +206,7 @@ class MatriculaService
             'estado' => 'retirada',
             'motivo_retiro' => $datos['motivo'],
             'detalle_retiro' => $datos['motivo'] === 'Otro' ? $datos['detalle'] : null,
-            'fecha_retiro' => now()->toDateString(),
+            'fecha_retiro' => PeriodoAcademico::hoy(),
             'retirado_por' => $usuarioId,
         ]);
 

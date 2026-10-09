@@ -11,9 +11,11 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -63,6 +65,16 @@ return Application::configure(basePath: dirname(__DIR__))
             before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
             prepend: EstablecerUsuarioActual::class,
         );
+
+        // El permiso (capa 2) se revisa ANTES de resolver el modelo de la
+        // ruta. Al revés, un rol sin permiso recibía 404 en vez de 403 en
+        // `/usuarios/{usuario}`, `/notas/{nota}/correccion`... (RLS le
+        // ocultaba la fila y el binding fallaba primero). Queda después de
+        // la autenticación porque necesita `$request->user()`.
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: RequierePermiso::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Formato de error uniforme para toda la API -- ver
@@ -70,6 +82,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // Nunca se expone el mensaje crudo de una excepción no
         // clasificada ni de Postgres/Eloquent: eso puede incluir nombres
         // de columnas, restricciones o fragmentos de la query.
+
+        // Un ErrorDeNegocio es un mensaje para la persona ("Correo o
+        // contraseña incorrectos", "esa nota ya estaba registrada"), no una
+        // falla del sistema: no va al log. Antes cada uno quedaba como
+        // ERROR, dos veces -- en producción eso llena el disco y esconde
+        // los errores de verdad.
+        $exceptions->dontReport([ErrorDeNegocio::class]);
 
         $exceptions->render(function (ErrorDeNegocio $e, Request $request) {
             if (! $request->is('api/*')) {
@@ -136,7 +155,9 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            report($e); // detalle completo (incluida la query) solo al log del servidor
+            // Sin `report($e)` acá: Laravel ya reportó la excepción (con la
+            // query completa) ANTES de llamar a este render. Llamarlo de
+            // nuevo dejaba cada error dos veces en el log.
 
             return response()->json([
                 'error' => [
@@ -146,12 +167,35 @@ return Application::configure(basePath: dirname(__DIR__))
             ], 500);
         });
 
-        $exceptions->render(function (Throwable $e, Request $request) {
+        // Una respuesta ya armada (por ejemplo, el 429 del límite de
+        // intentos de login, ver AppServiceProvider) se devuelve tal cual.
+        // Sin esto, el atrapa-todo de abajo la convertía en 500.
+        $exceptions->render(function (HttpResponseException $e, Request $request) {
+            return $request->is('api/*') ? $e->getResponse() : null;
+        });
+
+        // Los demás errores HTTP (405 método no permitido, 429, 413...) con
+        // su código real y un mensaje en español, no como 500.
+        $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
             if (! $request->is('api/*')) {
                 return null;
             }
 
-            report($e);
+            $estado = $e->getStatusCode();
+            [$codigo, $mensaje] = match ($estado) {
+                405 => ['METODO_NO_PERMITIDO', 'Esa acción no existe en esta dirección.'],
+                413 => ['DEMASIADO_GRANDE', 'Lo que se envió es demasiado grande.'],
+                429 => ['DEMASIADAS_SOLICITUDES', 'Demasiadas solicitudes seguidas. Espera un momento y vuelve a intentar.'],
+                default => ['ERROR_HTTP', 'No se pudo completar la operación.'],
+            };
+
+            return response()->json(['error' => ['codigo' => $codigo, 'mensaje' => $mensaje]], $estado, $e->getHeaders());
+        });
+
+        $exceptions->render(function (Throwable $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
 
             return response()->json([
                 'error' => ['codigo' => 'ERROR_INTERNO', 'mensaje' => 'Error interno'],

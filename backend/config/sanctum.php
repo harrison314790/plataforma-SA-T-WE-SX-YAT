@@ -50,7 +50,13 @@ return [
     |
     */
 
-    'expiration' => null,
+    // 12 horas (una jornada escolar con margen). Antes era `null`: un
+    // token no vencía nunca, y en los equipos compartidos de las escuelas
+    // una sesión olvidada o copiada servía para siempre. Al vencer, la API
+    // responde 401 y Angular manda al login (sesionExpiradaInterceptor).
+    // Los vencidos se borran con `php artisan sanctum:prune-expired`
+    // (programado en routes/console.php).
+    'expiration' => (int) env('SANCTUM_EXPIRATION', 720),
 
     /*
     |--------------------------------------------------------------------------

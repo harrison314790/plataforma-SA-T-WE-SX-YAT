@@ -1,4 +1,5 @@
 -- ============================================================
+-- NO es idempotente: se corre UNA vez, en orden. (24 sí lo es.)
 -- 21-notas-modulo.sql
 -- Lo que necesita la BASE para el módulo de Notas (las dos pantallas:
 -- "Registro de notas" del profesor y "Seguimiento de notas" de

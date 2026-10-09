@@ -27,7 +27,8 @@ Route::prefix('v1')->group(function () {
 
     // Login es el único endpoint de autenticación que NO usa 'auth.rls' --
     // todavía no hay sesión de Sanctum que resolver. Ver AutenticacionService.
-    Route::post('/autenticacion/login', [AutenticacionController::class, 'login']);
+    Route::post('/autenticacion/login', [AutenticacionController::class, 'login'])
+        ->middleware('throttle:login');
 
     // 'auth.rls' = [EstablecerUsuarioActual::class, 'auth:sanctum'] (ver
     // bootstrap/app.php). NINGUNA ruta protegida debería usar
@@ -180,9 +181,11 @@ Route::prefix('v1')->group(function () {
                     ->middleware('requiere.permiso:btn_gestionar_grados');
 
                 Route::patch('/{ofertaGrado}/activo', [OfertaGradoController::class, 'cambiarEstado'])
+                    ->whereNumber('ofertaGrado')
                     ->middleware('requiere.permiso:btn_gestionar_grados');
 
                 Route::delete('/{ofertaGrado}', [OfertaGradoController::class, 'destroy'])
+                    ->whereNumber('ofertaGrado')
                     ->middleware('requiere.permiso:btn_gestionar_grados');
             });
 
@@ -202,12 +205,12 @@ Route::prefix('v1')->group(function () {
 
                 Route::middleware('requiere.permiso:btn_gestionar_nudos')->group(function () {
                     Route::post('/asignaturas', [NudoPedagogicoController::class, 'crearMateria']);
-                    Route::put('/asignaturas/{asignatura}', [NudoPedagogicoController::class, 'actualizarMateria']);
-                    Route::patch('/asignaturas/{asignatura}', [NudoPedagogicoController::class, 'asignarNudo']);
-                    Route::delete('/asignaturas/{asignatura}', [NudoPedagogicoController::class, 'eliminarMateria']);
+                    Route::put('/asignaturas/{asignatura}', [NudoPedagogicoController::class, 'actualizarMateria'])->whereNumber('asignatura');
+                    Route::patch('/asignaturas/{asignatura}', [NudoPedagogicoController::class, 'asignarNudo'])->whereNumber('asignatura');
+                    Route::delete('/asignaturas/{asignatura}', [NudoPedagogicoController::class, 'eliminarMateria'])->whereNumber('asignatura');
                     Route::post('/', [NudoPedagogicoController::class, 'store']);
-                    Route::put('/{nudo}', [NudoPedagogicoController::class, 'update']);
-                    Route::delete('/{nudo}', [NudoPedagogicoController::class, 'destroy']);
+                    Route::put('/{nudo}', [NudoPedagogicoController::class, 'update'])->whereNumber('nudo');
+                    Route::delete('/{nudo}', [NudoPedagogicoController::class, 'destroy'])->whereNumber('nudo');
                 });
             });
 

@@ -104,23 +104,22 @@ insert into asignaturas (nombre, codigo) values
   ('Ciencias Naturales', 'CNA');
 
 -- ─────────────────────────────────────────────
--- 7. PERÍODOS — dos cerrados, uno activo, uno futuro
+-- 7. PERÍODOS — el calendario 2026 del mockup aprobado
+--
+-- Fechas FIJAS, no relativas a current_date. Con fechas relativas y el
+-- año escrito a mano (2026), una instalación desde cero hecha fuera de
+-- 2026 dejaba las épocas fuera de su año, y 22-epocas-por-fecha.sql
+-- (check `periodos_fechas_en_su_anio`) abortaba. Desde 22 la época
+-- activa sale de estas fechas; `activo` se llena acá solo porque la
+-- columna todavía existe en este punto del orden de scripts.
 -- ─────────────────────────────────────────────
 insert into periodos_academicos
   (nombre, anio, numero, fecha_inicio, fecha_fin, fecha_limite_notas, notas_habilitadas, activo)
 values
-  ('2026-1', 2026, 1,
-   current_date - interval '220 days', current_date - interval '160 days',
-   current_date - interval '150 days', false, false),
-  ('2026-2', 2026, 2,
-   current_date - interval '140 days', current_date - interval '80 days',
-   current_date - interval '70 days',  false, false),
-  ('2026-3', 2026, 3,
-   current_date - interval '60 days',  current_date + interval '20 days',
-   current_date + interval '15 days',  true,  true),   -- período activo
-  ('2026-4', 2026, 4,
-   current_date + interval '30 days',  current_date + interval '90 days',
-   current_date + interval '95 days',  true,  false);
+  ('2026-1', 2026, 1, '2026-02-02', '2026-04-17', '2026-04-13 18:00-05', false, false),
+  ('2026-2', 2026, 2, '2026-04-27', '2026-06-26', '2026-07-02 18:00-05', false, false),
+  ('2026-3', 2026, 3, '2026-09-07', '2026-11-27', '2026-10-20 23:00-05', true,  true),
+  ('2026-4', 2026, 4, '2026-11-30', '2026-12-11', '2026-12-14 18:00-05', true,  false);
 
 -- ─────────────────────────────────────────────
 -- 8. ASIGNACIONES — AHORA con tres grados distintos:

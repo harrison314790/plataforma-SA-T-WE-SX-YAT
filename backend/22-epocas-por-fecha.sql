@@ -1,4 +1,5 @@
 -- ============================================================
+-- NO es idempotente: se corre UNA vez, en orden. (24 sí lo es.)
 -- 22-epocas-por-fecha.sql
 -- La época activa sale del CALENDARIO, no de una marca a mano.
 --

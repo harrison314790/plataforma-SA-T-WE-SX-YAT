@@ -39,10 +39,11 @@ class PeriodoActivoResource extends JsonResource
             // Negativo = el plazo ya venció. Se manda con signo en vez de
             // recortar a 0 para que la barra superior pueda decir "cerró
             // hace 3 días", que es información distinta de "cierra hoy".
-            'diasRestantes' => (int) now()->startOfDay()->diffInDays(
-                $this->fecha_limite_notas->startOfDay(),
-                false,
-            ),
+            // Días COMPLETOS que faltan (13 días y 13 horas = 13), igual que
+            // la banda del módulo de Notas. Antes se contaban días de
+            // calendario en UTC y la barra decía "Cierra en 14 días" junto
+            // a una banda que decía "faltan 13".
+            'diasRestantes' => (int) floor(now()->diffInSeconds($this->fecha_limite_notas, false) / 86400),
 
             // La misma pregunta que responde la política RLS de inserción
             // de notas, contestada con el método del modelo para no

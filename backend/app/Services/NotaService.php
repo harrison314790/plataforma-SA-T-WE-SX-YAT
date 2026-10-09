@@ -114,6 +114,13 @@ class NotaService
         }
 
         if ($usuario->rol->nombre === 'profesor') {
+            // Antes de esto, una asignación desactivada llegaba hasta el
+            // INSERT, RLS lo rechazaba y salía un 500. La regla era la
+            // correcta; el mensaje no.
+            if (! $asignacion->activo) {
+                throw new ErrorDeNegocio('Esta asignación está desactivada y ya no recibe notas. Comunícate con coordinación.');
+            }
+
             $this->verificarPlazoParaProfesor($usuario, $asignacion, $periodo);
         }
 
@@ -224,13 +231,35 @@ class NotaService
     {
         $valor = round((float) $datos['valor'], 1);
 
+        // Se relee CON BLOQUEO DE FILA: con dos correcciones exactamente
+        // simultáneas, las dos leían 4,2 antes de que ninguna escribiera.
+        // `lockForUpdate` hace esperar a la segunda hasta que la primera
+        // termine (todo corre en la transacción del request).
+        $nota->valor = Nota::query()->whereKey($nota->getKey())->lockForUpdate()->value('valor');
+
+        // Concurrencia optimista: la pantalla manda el valor que estaba
+        // viendo. Si otra persona la corrigió mientras tanto, se rechaza
+        // en vez de pisarla a ciegas -- el modal decía "valor anterior
+        // 4,2" y en realidad ya era 3,3.
+        if (isset($datos['valor_anterior'])
+            && abs(round((float) $datos['valor_anterior'], 1) - (float) $nota->valor) >= 0.01) {
+            throw new ErrorDeNegocio(
+                'Esta nota cambió mientras la corregías (ahora vale '.number_format((float) $nota->valor, 1, ',', '').'). Cierra y vuelve a abrir la corrección.'
+            );
+        }
+
         if (abs($valor - (float) $nota->valor) < 0.01) {
             throw new ErrorDeNegocio('El valor nuevo es igual al anterior.');
         }
 
         DB::statement("select set_config('app.motivo_correccion', ?, true)", [trim($datos['motivo'])]);
 
-        $nota->update(['valor' => $valor]);
+        // `update` de Eloquent no avisa si RLS dejó 0 filas: se cuenta.
+        $afectadas = Nota::query()->whereKey($nota->getKey())->update(['valor' => $valor]);
+
+        if ($afectadas === 0) {
+            throw new ErrorDeNegocio('No se pudo guardar la corrección: tu cuenta no tiene permiso sobre esta nota.');
+        }
 
         return $this->notaDetalle($nota->refresh()->load(['registradoPor', 'historial.corregidoPor']));
     }

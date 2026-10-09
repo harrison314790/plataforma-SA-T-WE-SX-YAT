@@ -37,6 +37,16 @@
          FormsModule, el Enter / el botón "Guardar" disparaban el envío nativo
          del navegador: la página se recargaba y el POST nunca salía. -->
     <form class="modal__cuerpo formulario" novalidate (submit)="$event.preventDefault(); enviar(false)">
+      @if (bloqueadaPorNotas()) {
+        <p class="aviso aviso--bloqueo" role="status">
+          <app-icono nombre="candado" [tamano]="16" />
+          <span>
+            Esta asignación ya tiene {{ asignacion()!.cantidadNotas }} notas registradas: el curso, la materia y el año
+            no se pueden cambiar. Sí se puede cambiar el profesor (por uno de la misma sede). Si hace falta otro curso,
+            desactívala y crea una nueva.
+          </span>
+        </p>
+      }
       <label class="campo">
         <span class="campo__rotulo">Profesor <span class="campo__obligatorio">*</span></span>
         <select
@@ -106,7 +116,7 @@
           <select
             class="campo__control"
             [value]="grado() ?? ''"
-            [disabled]="sede() === null"
+            [disabled]="sede() === null || bloqueadaPorNotas()"
             (change)="elegirGrado($any($event.target).value)"
           >
             <option value="" [selected]="grado() === null">Elige un grado</option>
@@ -125,7 +135,7 @@
           <select
             class="campo__control"
             [value]="grupo() ?? ''"
-            [disabled]="grado() === null"
+            [disabled]="grado() === null || bloqueadaPorNotas()"
             (change)="elegirGrupo($any($event.target).value)"
           >
             <option value="" [selected]="grupo() === null">Elige un grupo</option>
@@ -145,7 +155,7 @@
         <select
           class="campo__control"
           [value]="asignaturaId() ?? ''"
-          [disabled]="grado() === null"
+          [disabled]="grado() === null || bloqueadaPorNotas()"
           (change)="elegirAsignatura($any($event.target).value)"
         >
           <option value="" [selected]="asignaturaId() === null">Elige una asignatura</option>
@@ -170,6 +180,7 @@
         <select
           class="campo__control"
           [value]="anio() ?? ''"
+          [disabled]="bloqueadaPorNotas()"
           (change)="elegirAnio($any($event.target).value)"
         >
           <option value="" [selected]="anio() === null">Elige un año</option>

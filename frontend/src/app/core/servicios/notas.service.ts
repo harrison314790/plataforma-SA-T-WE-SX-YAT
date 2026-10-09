@@ -57,8 +57,11 @@ export class NotasService {
     );
   }
 
-  async corregir(notaId: string, valor: number, motivo: string): Promise<NotaDetalle> {
-    return firstValueFrom(this.http.put<NotaDetalle>(`${this.base}/${notaId}/correccion`, { valor, motivo }));
+  /** `valorAnterior`: el que se veía al abrir; si cambió mientras tanto, el backend rechaza. */
+  async corregir(notaId: string, valor: number, motivo: string, valorAnterior: number): Promise<NotaDetalle> {
+    return firstValueFrom(
+      this.http.put<NotaDetalle>(`${this.base}/${notaId}/correccion`, { valor, motivo, valor_anterior: valorAnterior }),
+    );
   }
 
   async cambiarPlazo(

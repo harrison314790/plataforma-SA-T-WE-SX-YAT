@@ -89,6 +89,18 @@ export class FormularioAsignacionComponent {
 
   protected readonly esEdicion = computed(() => this.asignacion() !== null);
 
+  /**
+   * Con notas, la asignación ya no cambia de curso, materia ni año: sus
+   * notas quedarían colgando de algo que no calificaron (las de 9-B en
+   * 8-A, las de Español contando como Matemáticas). Solo se puede cambiar
+   * el profesor -- el reemplazo de un docente --, y solo por uno de la
+   * MISMA sede, porque la sede sale del profesor. El backend y la base lo
+   * exigen igual (AsignacionService::actualizar, trigger de
+   * 24-correcciones-auditoria.sql); acá se evita que la persona llene un
+   * formulario que va a ser rechazado.
+   */
+  protected readonly bloqueadaPorNotas = computed(() => (this.asignacion()?.cantidadNotas ?? 0) > 0);
+
   constructor() {
     // Rellena el formulario al abrirlo. `allowSignalWrites` porque el
     // efecto existe justamente para escribir los campos a partir de una
@@ -108,9 +120,12 @@ export class FormularioAsignacionComponent {
     );
   }
 
-  protected readonly profesores = computed<ProfesorOpcion[]>(
-    () => this.opciones().profesores,
-  );
+  protected readonly profesores = computed<ProfesorOpcion[]>(() => {
+    const todos = this.opciones().profesores;
+    const actual = this.asignacion();
+    if (!this.bloqueadaPorNotas() || actual === null) return todos;
+    return todos.filter((p) => p.sede?.id === actual.sede.id);
+  });
 
   protected readonly anios = computed(() => this.opciones().anios.disponibles);
 
