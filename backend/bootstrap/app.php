@@ -75,6 +75,23 @@ return Application::configure(basePath: dirname(__DIR__))
             before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
             prepend: RequierePermiso::class,
         );
+
+        // Detrás de un proxy (demo/: Cloudflare Tunnel -> nginx), el
+        // esquema y el host originales llegan en X-Forwarded-Proto/Host.
+        // Solo se confía en ellos si TRUSTED_PROXIES está definida; sin
+        // ella (desarrollo con `php artisan serve`) nada cambia.
+        // X-Forwarded-For NO se confía a propósito: nginx ya pone en
+        // REMOTE_ADDR la IP real del visitante (CF-Connecting-IP), y
+        // confiar en ese encabezado dejaría que un cliente inventara su
+        // IP para esquivar el límite de intentos del login.
+        if ($proxies = env('TRUSTED_PROXIES')) {
+            $middleware->trustProxies(
+                at: $proxies,
+                headers: Request::HEADER_X_FORWARDED_PROTO
+                    | Request::HEADER_X_FORWARDED_HOST
+                    | Request::HEADER_X_FORWARDED_PORT,
+            );
+        }
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Formato de error uniforme para toda la API -- ver

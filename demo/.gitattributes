@@ -1,0 +1,6 @@
+# Estos archivos se ejecutan dentro de contenedores Linux: siempre LF,
+# aunque el repo se clone en Windows con autocrlf.
+*.sh   text eol=lf
+*.conf text eol=lf
+*.ini  text eol=lf
+Dockerfile* text eol=lf

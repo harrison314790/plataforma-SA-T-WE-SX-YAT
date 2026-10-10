@@ -1,0 +1,99 @@
+# Entorno de DEMO -- todo en el portátil, publicado con Cloudflare Tunnel.
+# No toca mi-postgres / sistema_academico (desarrollo) ni producción:
+# volúmenes, red y nombres propios (proyecto "sademo").
+# Uso: ver demo/README.md.
+name: sademo
+
+services:
+  db:
+    image: postgres:16            # misma major que mi-postgres (postgres:16)
+    environment:
+      POSTGRES_DB: sistema_academico_demo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en demo/.env -- corre demo/init-db.sh}
+      TZ: UTC
+    volumes:
+      - demo_pgdata:/var/lib/postgresql/data
+    # Sin "ports": el 5432 de la demo NO se publica al host.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sistema_academico_demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ../backend
+      dockerfile: ../demo/php/Dockerfile
+      additional_contexts:
+        demo: .
+    image: sademo-app
+    env_file: backend.env
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: sistema_academico_demo
+      # La app SIEMPRE entra como app_user (sin superusuario, sin
+      # BYPASSRLS): si entrara como postgres, RLS no filtraría nada.
+      DB_USERNAME: app_user
+      DB_PASSWORD: ${APP_USER_PASSWORD:?falta APP_USER_PASSWORD en demo/.env}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  web:
+    image: nginx:1.27-alpine
+    ports:
+      # Solo en localhost: cloudflared (en el host) entra por aquí; nadie
+      # de la red Wi-Fi puede saltarse el túnel.
+      - "127.0.0.1:80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - front_dist:/usr/share/nginx/html:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # Compila Angular UNA vez y deja el resultado en front_dist.
+  #   docker compose --profile build run --rm build-front
+  # Copia el código a una carpeta interna antes de `npm ci` para no
+  # pisar el node_modules de Windows del portátil.
+  build-front:
+    profiles: ["build"]
+    image: node:20-bookworm-slim
+    working_dir: /build
+    volumes:
+      - ../frontend:/src:ro
+      - front_dist:/out
+      - npm_cache:/root/.npm
+    environment:
+      NG_CLI_ANALYTICS: "false"
+    command:
+      - sh
+      - -ec
+      - |
+        tar -C /src --exclude=./node_modules --exclude=./dist --exclude=./.angular -cf - . | tar -xf -
+        npm ci --no-audit --no-fund
+        npx ng build --configuration production
+        test -f dist/frontend/browser/index.html
+        rm -rf /out/* && cp -r dist/frontend/browser/. /out/
+        echo "Angular compilado en el volumen front_dist"
+
+volumes:
+  demo_pgdata:
+  front_dist:
+  npm_cache:

@@ -1,0 +1,4 @@
+# Secretos y datos de la demo: nunca al repositorio.
+.env
+backend.env
+backups/
